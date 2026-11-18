@@ -88,6 +88,17 @@ ps_3_0), with the XDK's whole D3DX HLSL compiler linked statically (2,589 functi
   functions kept out of it). It is a CPU cost on the console (katamari-nx: the save / restore helpers were ~20 % of
   its main thread's ARM samples without it), not a picture one. `out/renut_config_diet.toml` keeps the diet's config.
 
+### Calling convention (2026-11-19, tools/cc_entry_census.py and tools/cc_exit_census.py)
+
+- Entry: "pointer-reached functions reading v0 or v32-v63 on entry (must be none): none". `SASRT_REG_LIVENESS_HOOKS_ABI`
+  stays on.
+- Exit: 5,435 indirect call sites, 15 with an EXIT_DEAD register read after the call. 14 are r0, each in
+  `twi 31,r0,22` (TO=31: an unconditional trap, MSVC's bounds-check break; the value of r0 does not matter) in
+  `sub_823C8608`, `sub_82295F08`, `sub_822962D8`, `sub_82183AE0`, `sub_823EBBB0`, `sub_822CF098`. One is r6 in the HLSL
+  compiler's `sub_823E2C28` (node 214): a loop's bitmask (`and. r11,r10,r6`, `or r10,r10,r6`) reached after its
+  indirect handler call; not shown value-independent. So **`SASRT_REG_LIVENESS_EXIT_ABI` is off for this game**
+  (`tools/reg_liveness.py`'s default here: everything live at a pointer-reached function's exit), as the method says.
+
 ### Functions found at run time
 
 - First PC boot: "Call to invalid or unregistered function" at `0x82197470`. A run of vtable methods (the vtable at

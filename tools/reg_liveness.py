@@ -77,7 +77,12 @@ HOOK_USE = INDIRECT_USE if HOOKS_ABI else ALL
 # at its exit (LiveOut; r3/r4, f1-f4 and v1-v4 kept as results, with a margin); a direct callee's LiveOut stays what its
 # callers read (tools/localize_native.py's write-backs and the guard's skip set take this LiveOut for r/f too).
 # SASRT_REG_LIVENESS_EXIT_ABI=0: everything live there, as before.
-EXIT_ABI = os.environ.get('SASRT_REG_LIVENESS_EXIT_ABI', '1') != '0'
+# culdcept-nx (2026-11-19): OFF by default for Culdcept Saga. tools/cc_exit_census.py found 15 sites reading an
+# EXIT_DEAD register after an indirect call: 14 are r0 in `twi 31,r0,22` (an unconditional trap: value-independent), and
+# one is r6 in the HLSL compiler's sub_823E2C28, a loop's bitmask (`and. r11,r10,r6` / `or r10,r10,r6`) reached after
+# its indirect handler call, not shown value-independent. As the method says: everything live at the exit.
+# SASRT_REG_LIVENESS_EXIT_ABI=1 gives the convention back (docs/culdcept-notes.md, "Calling convention").
+EXIT_ABI = os.environ.get('SASRT_REG_LIVENESS_EXIT_ABI', '0') != '0'
 EXIT_DEAD = (SCRATCH_V | sum(V(n) for n in range(5, 14)) | R(0) | sum(R(n) for n in range(5, 13)) | F(0)
              | sum(F(n) for n in range(5, 14))) if EXIT_ABI else 0
 REG = re.compile(r'(?<![\w])([rfv])(\d+)(?![\w])')
