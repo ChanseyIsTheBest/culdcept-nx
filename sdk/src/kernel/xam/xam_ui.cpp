@@ -19,6 +19,10 @@
 
 REXCVAR_DEFINE_BOOL(headless, false, "Kernel",
                     "Don't display any UI, using defaults for prompts as needed");
+// culdcept-nx (2026-11-19): test routes through a name the game leaves empty.
+REXCVAR_DEFINE_STRING(headless_keyboard_text, "", "Kernel",
+                      "With headless: the text a keyboard prompt (XamShowKeyboardUI) answers with, as if typed. Empty: "
+                      "the game's default text, as before");
 // banjo-nx (2026-10-21): the game's Xbox 360 keyboard (XShowKeyboardUI) as the Switch's own (xam_ui_switch.cpp).
 REXCVAR_DEFINE_BOOL(switch_software_keyboard, true, "Kernel",
                     "Switch: the game's on-screen keyboard is the system's software keyboard applet. false = the "
@@ -595,6 +599,13 @@ u32 XamShowKeyboardUI_entry(u32 user_index, u32 flags, mapped_wstring default_te
   X_RESULT result;
   if (REXCVAR_GET(headless)) {
     auto run = [default_text, buffer, buffer_length, buffer_size]() -> X_RESULT {
+      // culdcept-nx (2026-11-19): a test route's answer for a game whose default text is empty (Culdcept Saga's
+      // Cepter name: an empty name keeps "Create Cepter" disabled), as if typed.
+      const std::string& typed = REXCVAR_GET(headless_keyboard_text);
+      if (!typed.empty()) {
+        rex::string::copy_and_swap_truncating(buffer, rex::string::to_utf16(typed), buffer_length);
+        return X_ERROR_SUCCESS;
+      }
       // Redirect default_text back into the buffer.
       if (!default_text) {
         std::memset(buffer, 0, buffer_size);
