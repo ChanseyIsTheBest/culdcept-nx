@@ -324,6 +324,15 @@ FL and FR only in every window. The game's mix does not depend on the configurat
   **`banjo_renut_fast_fetch_check`** (on): each sampled slot's six fetch words and the device's texture pointer are
   compared with the last fast draw's, and a difference redoes the textures; the 10 s fast-draw line counts the draws
   it caught ("fetch words changed with no field bit"). It only adds recomputations.
+  **Result (emu14, the fast draw on with the check)**: the panels broken again (3 of 3 runs with the fast draw) and
+  the check caught **0** draws in every window: the slots' fetch words and texture pointers do not change unseen, so
+  that is not it. The check was taken out again (commit after 06344559). **Left open**: what goes stale is some other
+  state the fast draw keeps when no field bit says it changed; the strongest lead is the dirty tags the game's own
+  inlined Direct3D setters set (`m_Pending` words 2-4, read as marks: `d3d_native.h`, `kStateTagChunks`), whose
+  words and bits may sit elsewhere in XDK 2.0.3424 than in the XDKs Renut was written for (a `` bool left
+  stale would draw a panel untextured: a coloured translucent box, as seen). **Shipped: the fast draw off**, the
+  picture right in 3 of 3 runs; its cost is the render thread's (a proxy: about 15-16 ms a frame in Ryujinx, the
+  story's scenes under 60 fps there; the console decides).
 
 ## Hot functions: the machine copies (2026-11-19)
 

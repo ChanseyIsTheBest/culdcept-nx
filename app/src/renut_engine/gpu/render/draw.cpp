@@ -323,14 +323,6 @@ REXCVAR_DEFINE_BOOL(banjo_renut_fast_draw, true, "Banjo/Enhancements",
                     "predication, Draw*UP, points, tessellation, memexport, the fur, the composite and range geometry "
                     "keep DrawStateLocked. A/B target 25. Off: DrawStateLocked for every draw")
     .lifecycle(rex::cvar::Lifecycle::kInitOnly);
-// culdcept-nx (2026-11-19): see FastDrawLocked's textures_inputs.
-REXCVAR_DEFINE_BOOL(banjo_renut_fast_fetch_check, true, "Banjo/Renut",
-                    "Renut's fast draw (banjo_renut_fast_draw): each sampled slot's fetch words and texture pointer are "
-                    "compared with the last fast draw's, and the textures redone when one changed, whatever the "
-                    "recording's field bits say (a game with Direct3D's setters inlined changed a texture with no field "
-                    "bit: Culdcept Saga's board panels kept the draw before's textures). Off: the field bits and epochs "
-                    "alone, as before")
-    .lifecycle(rex::cvar::Lifecycle::kInitOnly);
 // banjo-nx (2026-10-27): the shadow-path census (draw.h DrawKindsReport).
 REXCVAR_DEFINE_BOOL(banjo_renut_diag_draw_kinds, false, "Banjo/Diagnostics",
                     "Renut's renderer (2026-10-27): the replayed draws by kind (shadow maps: a depth target and no pixel "
@@ -10370,9 +10362,6 @@ struct FastState {
   uint64_t texture_frame = 0, texture_epoch = 0, depth_epoch = 0;
   u32 texture_va[32] = {};
   u32 texture_header[32][6] = {};
-  // culdcept-nx (2026-11-19, banjo_renut_fast_fetch_check): each sampled slot's fetch words (6) and the device's texture
-  // pointer as the last fast draw saw them.
-  u32 fetch_seen[32][7] = {};
   const TextureObject *texture_obj[32] = {};  // banjo-nx (2026-10-27, Phase A): the slots' objects at the last fill
   BindEffects fx[32];
   PipelineKey key{};
@@ -10578,13 +10567,6 @@ uint64_t g_fast_pipeline_hits = 0, g_fast_pipeline_misses = 0;  // the 10 s line
 // from before an invalidation (generation).
 uint64_t g_fast_pipeline_miss_why[4] = {};
 uint64_t g_fast_draws = 0, g_full_draws = 0, g_fast_why[16] = {};  // the 10 s line's
-// culdcept-nx (2026-11-19): fast draws whose textures were redone only because banjo_renut_fast_fetch_check saw a slot's
-// fetch words or texture pointer change with no field bit (the 10 s line's).
-uint64_t g_fast_fetch_catches = 0;
-inline bool FastFetchCheckOn() {
-  static const bool on = REXCVAR_GET(banjo_renut_fast_fetch_check);
-  return on;
-}
 
 // The reasons a draw went to DrawStateLocked, by the first met (the 10 s line).
 enum FastWhy : u32 {
@@ -11142,34 +11124,14 @@ int FastDrawLocked(const u8 *device_state, const DrawCall &call, const ReplayCon
   FastFetches fetch_storage;
   TextureFetch *const fetches = fetch_storage.f;
   // (A texture slot from 26 on is read through the vertex fetch constants' words.)
-  bool textures_inputs = (fields & (kFieldFetch | kFieldTexWords)) ||
-                         ((fields & kFieldVertexFetch) && (texture_mask >> d3d::kTextureFetchSlots)) ||
-                         entries_changed || depth_only != f.depth_only ||
-                         targets_changed ||
-                         !f.textures_valid || f.texture_mask != texture_mask ||
-                         f.texture_frame != TextureFrameLocked() || f.texture_epoch != g_texture_epoch ||
-                         f.depth_epoch != g_depth_epoch;
+  const bool textures_inputs = (fields & (kFieldFetch | kFieldTexWords)) ||
+                               ((fields & kFieldVertexFetch) && (texture_mask >> d3d::kTextureFetchSlots)) ||
+                               entries_changed || depth_only != f.depth_only ||
+                               targets_changed ||
+                               !f.textures_valid || f.texture_mask != texture_mask ||
+                               f.texture_frame != TextureFrameLocked() || f.texture_epoch != g_texture_epoch ||
+                               f.depth_epoch != g_depth_epoch;
   const d3d::Device &dev = device.dev();
-  // culdcept-nx (2026-11-19, banjo_renut_fast_fetch_check): the slots' fetch words and texture pointers compared with
-  // the last fast draw's, whatever the field bits say. Culdcept Saga (D3D9LTCG: Direct3D's setters inlined into the
-  // game) changed a slot's texture between two draws of a frame with no field bit, and the fast draw kept the draw
-  // before's texture: the board map's dialogue box, HUD and sign drawn with other textures in Ryujinx.
-  if (FastFetchCheckOn()) {
-    const uint8_t *fetch_base = reinterpret_cast<const uint8_t *>(&dev.m_Constants.TextureFetch[0]);
-    for (u32 bits = texture_mask; bits; bits &= bits - 1) {
-      const u32 r = u32(std::countr_zero(bits));
-      u32 now[7];
-      std::memcpy(now, fetch_base + size_t(r) * 24, 24);
-      now[6] = r < d3d::kTextureFetchSlots ? device.U32(d3d::kDeviceOffsetTextures + r * 4) : 0u;
-      if (std::memcmp(now, f.fetch_seen[r], sizeof(now)) != 0) {
-        std::memcpy(f.fetch_seen[r], now, sizeof(now));
-        if (!textures_inputs) {
-          textures_inputs = true;
-          ++g_fast_fetch_catches;
-        }
-      }
-    }
-  }
   const bool exports_pending = AnyPendingExports();
   // Round 4: which kinds of read the export test looks at again (each kind's answer kept by the export generation
   // while its inputs are the same).
@@ -12313,9 +12275,6 @@ std::string FastDrawReport() {
     std::fill(std::begin(g_diag_push_float), std::end(g_diag_push_float), 0);
   }
 #endif
-  // culdcept-nx (2026-11-19): banjo_renut_fast_fetch_check's catches.
-  out += fmt::format(" [fetch words changed with no field bit: {} (banjo_renut_fast_fetch_check)]", g_fast_fetch_catches);
-  g_fast_fetch_catches = 0;
   g_rs_id_hits = g_rs_id_new = 0;
   for (u32 i = 0; i < kFastWhyCount; ++i) {
     if (g_fast_why[i])
