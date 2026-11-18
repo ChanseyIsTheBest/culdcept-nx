@@ -146,8 +146,10 @@ target_link_libraries(renut PRIVATE banjo_renut_gpu)
 target_compile_definitions(renut PRIVATE BANJO_RENUT_RENDERER=1)
 # katamari-nx (2026-10-30): Renut's hooks at Beautiful Katamari's functions (tools/renut_hook_remap_katamari.py,
 # docs/katamari-notes.md) are registered in this build; OFF compiles them unregistered (banjo_renut_select.h).
-option(KATAMARI_RENUT_HOOKS "Register Renut's hooks at Beautiful Katamari's functions" ON)
-if(KATAMARI_RENUT_HOOKS)
-    target_compile_definitions(banjo_renut_gpu PRIVATE KATAMARI_RENUT_HOOKS=1)
-    target_compile_definitions(renut PRIVATE KATAMARI_RENUT_HOOKS=1)
+# culdcept-nx: OFF until Renut's hooks are at Culdcept Saga's functions (docs/culdcept-notes.md, "Renut at this
+# game's addresses"): the handlers compile, no guest function is overridden.
+option(CULDCEPT_RENUT_HOOKS "Register Renut's hooks at Culdcept Saga's functions" OFF)
+if(CULDCEPT_RENUT_HOOKS)
+    target_compile_definitions(banjo_renut_gpu PRIVATE CULDCEPT_RENUT_HOOKS=1)
+    target_compile_definitions(renut PRIVATE CULDCEPT_RENUT_HOOKS=1)
 endif()

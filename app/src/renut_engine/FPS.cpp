@@ -10,7 +10,7 @@ namespace banjo::renderdoc { void GameFrame(); }  // me/banjo_renderdoc.cpp (ban
 
 // katamari-nx (2026-10-30): appMainTickPreDraw / appMainDraw are N&B's named functions; Beautiful Katamari has no such
 // names (its frame boundary is the Swap, docs/katamari-notes.md). Kept for reference, not built.
-#if KATAMARI_BANJO_ADDRESS_HOOKS
+#if CULDCEPT_BANJO_ADDRESS_HOOKS
 //CPU Time
 REX_EXTERN(__imp__appMainTickPreDraw);
 REX_HOOK_RAW(appMainTickPreDraw){
@@ -54,7 +54,7 @@ REX_HOOK_RAW(appMainDraw){
     banjo::harvest::Fotograma();  // shader harvesting fallback scan (banjo_volcar_shaders_en_sitio)
     banjo::renderdoc::GameFrame();  // PC diagnostic capture by time (banjo_renderdoc_game_s)
 }
-#endif  // KATAMARI_BANJO_ADDRESS_HOOKS
+#endif  // CULDCEPT_BANJO_ADDRESS_HOOKS
 
 void FPSCounter::Tick(){
     auto Time = std::chrono::steady_clock::now();

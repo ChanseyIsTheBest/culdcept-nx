@@ -249,7 +249,7 @@ REXCVAR_DEFINE_INT32(banjo_renut_portrait_fur_shells_percent, 100, "Banjo/Enhanc
     .range(25, 100);
 // renut-ultimate (2026-11-12, port 118, the user's choice): MSAA off by default in the base (1), SMAA on
 // (banjo_renut_smaa) smooths the edges instead. A game sets 4 (its own) or 2 in its toml.
-REXCVAR_DEFINE_INT32(msaa_level, 1, "Katamari/Graphics",
+REXCVAR_DEFINE_INT32(msaa_level, 1, "Culdcept/Graphics",
                      "Samples per pixel of the game's MSAA targets: 1 (off, the base's default: SMAA smooths the edges "
                      "instead), 2 or 4 (the game's own). Fewer: rougher edges, less GPU work");
 REXCVAR_DEFINE_INT32(banjo_renut_portrait_msaa_samples, 0, "Banjo/Enhancements",

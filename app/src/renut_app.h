@@ -30,12 +30,9 @@
 #include "renut_engine/gpu/banjo_renut_capture.h"
 #endif
 #include "cpu/banjo_enhancements.h"
-#if defined(KATAMARI_BUILTIN_CONFIG)
-#include "katamari_builtin_config.h"  // generated from app/katamari_switch_defaults.toml and katamari_switch.toml (CMake)
+#if defined(CULDCEPT_BUILTIN_CONFIG)
+#include "culdcept_builtin_config.h"  // generated from app/katamari_switch_defaults.toml and katamari_switch.toml (CMake)
 #endif
-namespace katamari::stage_diag {
-void Start();  // src/cpu/katamari_stage_diag.cpp
-}
 namespace blur::small_alloc {
 void Enable();  // blur-nx (2026-11-17, #220; renut-ultimate port 151): src/blur_small_alloc.cpp, after setup
 }
@@ -80,16 +77,16 @@ public:
     // katamari-nx (2026-11-02, sa2-nx's design): the Switch build's fixed settings, compiled in and applied before
     // katamari.toml, which holds only the player's options (a key added there still overrides these: test runs).
     std::string_view BuiltInConfig() const override {
-#if defined(KATAMARI_BUILTIN_CONFIG)
-        return kKatamariBuiltInConfig;
+#if defined(CULDCEPT_BUILTIN_CONFIG)
+        return kCuldceptBuiltInConfig;
 #else
         return {};
 #endif
     }
     // Without a katamari.toml next to the NRO, the player's default one is written there.
     std::string_view DefaultConfigFile() const override {
-#if defined(KATAMARI_BUILTIN_CONFIG)
-        return kKatamariPlayerConfig;
+#if defined(CULDCEPT_BUILTIN_CONFIG)
+        return kCuldceptPlayerConfig;
 #else
         return {};
 #endif
@@ -230,7 +227,6 @@ public:
         // One log line with every enhancement and whether it is active (src/cpu/banjo_enhancements.h).
         banjo::LogEnhancements();
         // katamari-nx (2026-11-01): katamari_diag_game_state (off): the stage fields of the game state, as they change.
-        katamari::stage_diag::Start();
         // PC: function-level CPU profile (banjo_pc_profile_s = N seconds per report; 0 = off; from futari-nx).
         banjo::pc_profiler::Start();
         // Switch: per-thread CPU accounting, the optional sampler and the stall watchdog.
@@ -278,10 +274,10 @@ public:
     // A game_root folder next to the executable is used when no path was given.
     // On the Switch that is sdmc:/switch/katamari-nx/game_root (the extracted disc).
     void OnConfigurePaths(rex::PathConfig& paths) override {
-#if defined(KATAMARI_BUILTIN_CONFIG)
+#if defined(CULDCEPT_BUILTIN_CONFIG)
         // The player's settings file. Not renut.toml: the test builds' full one, left on an SD card, would override
         // every built-in setting.
-        paths.config_path = rex::filesystem::GetExecutableFolder() / "katamari.toml";
+        paths.config_path = rex::filesystem::GetExecutableFolder() / "culdcept.toml";
 #endif
         if (paths.game_data_root.empty()) {
             const auto folder = rex::filesystem::GetExecutableFolder();

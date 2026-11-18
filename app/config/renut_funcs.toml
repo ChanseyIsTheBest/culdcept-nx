@@ -1,4 +1,4 @@
-# culdcept-nx: named functions and function boundaries of Culdcept Saga (docs/culdcept-notes.md, "Code generation").
+﻿# culdcept-nx: named functions and function boundaries of Culdcept Saga (docs/culdcept-notes.md, "Code generation").
 [functions]
 
 # tools/read_before_write.py app/generated --noreturn=82391F50 on code generated WITH the register diet (2026-11-19):
@@ -23,3 +23,13 @@
 "0x824F9AC0" = { share_registers = true }  # r16 r18 r24 r26 r28
 "0x824FBE50" = { share_registers = true }  # f31 r23 r24 r25 r26
 "0x8251A4A0" = { share_registers = true }  # r30
+
+# First PC boot (2026-11-19): "Call to invalid or unregistered function" at 0x82197470. A run of vtable methods (the
+# vtable at 0x82157180 and its neighbours: 0x821571EC, 0x82157210, 0x8215718C) that the scanner merged into one function
+# from 0x82197460: two this-adjusting thunks (addi r3,r3,-4; b ...) and two leaves (li r11,6 ... blr; lwz r11,12(r3)).
+# tools/wide_pointer_scan.py --all: the only data-referenced starts inside bodies outside the SEH scope tables
+# (0x82158xxx) and .pdata (0x82164xxx); the "built at" ones are switch cases.
+"0x82197460" = { end = 0x82197468 }
+"0x82197468" = { end = 0x82197470 }
+"0x82197470" = { end = 0x82197488 }
+"0x82197488" = { end = 0x82197498 }

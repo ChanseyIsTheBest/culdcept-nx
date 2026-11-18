@@ -1,8 +1,8 @@
-// katamari-nx (2026-10-30): the keys of banjo-nx files this port does not build, because their code is written for
+// culdcept-nx (from katamari-nx, 2026-10-30): the keys of banjo-nx files this port does not build, because their code is written for
 // N&B's addresses (cpu/banjo_reverb_native.cpp, cpu/banjo_xaudio_native.cpp, cpu/banjo_hot_guest.cpp,
 // renut_engine/hooks.cpp, renut_engine/frameHooks.cpp). banjo-nx's enhancement table (cpu/banjo_enhancements.cpp) and
 // Renut's renderer still read them by name, so they are defined here, off: nothing in this build uses their code.
-// Each comes back with its own file once it has been moved to Beautiful Katamari's functions (docs/katamari-notes.md).
+// Each comes back with its own file once it has been moved to Culdcept Saga's functions (docs/culdcept-notes.md).
 
 #include <rex/cvar.h>
 
@@ -17,13 +17,13 @@
 #include "renut_engine/display_sync.h"
 
 // N&B's XAudio natives (its reverb and sample-rate converter at N&B's addresses).
-REXCVAR_DEFINE_BOOL(banjo_native_reverb, false, "Katamari/Not built", "N&B's native XAudio reverb (not in this port)")
+REXCVAR_DEFINE_BOOL(banjo_native_reverb, false, "Culdcept/Not built", "N&B's native XAudio reverb (not in this port)")
     .lifecycle(rex::cvar::Lifecycle::kInitOnly);
-REXCVAR_DEFINE_BOOL(banjo_native_reverb_verify, false, "Katamari/Not built", "Verify mode of the above (not in this port)")
+REXCVAR_DEFINE_BOOL(banjo_native_reverb_verify, false, "Culdcept/Not built", "Verify mode of the above (not in this port)")
     .lifecycle(rex::cvar::Lifecycle::kInitOnly);
-REXCVAR_DEFINE_BOOL(banjo_native_xaudio_src, false, "Katamari/Not built", "N&B's native XAudio SRC (not in this port)")
+REXCVAR_DEFINE_BOOL(banjo_native_xaudio_src, false, "Culdcept/Not built", "N&B's native XAudio SRC (not in this port)")
     .lifecycle(rex::cvar::Lifecycle::kInitOnly);
-REXCVAR_DEFINE_BOOL(banjo_native_xaudio_src_verify, false, "Katamari/Not built", "Verify mode of the above (not in this port)")
+REXCVAR_DEFINE_BOOL(banjo_native_xaudio_src_verify, false, "Culdcept/Not built", "Verify mode of the above (not in this port)")
     .lifecycle(rex::cvar::Lifecycle::kInitOnly);
 
 // The hand-written natives' keys and banjo_hot_count are cpu/banjo_hot_guest.cpp's (Katamari's natives: memset and the
@@ -32,11 +32,11 @@ REXCVAR_DEFINE_BOOL(banjo_native_xaudio_src_verify, false, "Katamari/Not built",
 // renut_engine/hooks.cpp's MSAA switch: N&B's own key, read only by its mid-asm hooks at N&B's render-target setup
 // (hooks.cpp, which this port does not build). Renut's renderer reads msaa_level (1/2/4) instead (vivapinata-nx's note,
 // 2026-11-12; docs/katamari-notes.md, run emu3_nomsaa). Kept so the tomls that name it still load.
-REXCVAR_DEFINE_BOOL(disable_msaa, false, "Katamari/Graphics",
+REXCVAR_DEFINE_BOOL(disable_msaa, false, "Culdcept/Graphics",
                     "Not read in this port (N&B's key): msaa_level sets the samples (4, 2 or 1)");
 
 // The frame cap (renut_engine/frameHooks.cpp's limiter, not built here because of its N&B hooks).
-REXCVAR_DEFINE_STRING(frame_cap, "Off", "Katamari/Performance",
+REXCVAR_DEFINE_STRING(frame_cap, "Off", "Culdcept/Performance",
                       "Frame rate cap: Off (the game's own, uncapped as on the Xbox 360) or a number of frames a second")
     .lifecycle(rex::cvar::Lifecycle::kInitOnly);
 
@@ -118,13 +118,13 @@ void renutFrameLimit() {
 
 // banjo-nx's PM4 renderer's D3D-level fast paths (me/banjo_d3d_clear.h, me/banjo_d3d_native.h, defined there because
 // banjo_me_hooks.cpp includes them): its hooks are N&B's, so off here (masseffect_renderer_native stays false anyway).
-REXCVAR_DEFINE_BOOL(banjo_d3d_api_clear, false, "Katamari/Not built", "banjo-nx's PM4 renderer: Clear markers (not in this port)")
+REXCVAR_DEFINE_BOOL(banjo_d3d_api_clear, false, "Culdcept/Not built", "banjo-nx's PM4 renderer: Clear markers (not in this port)")
     .lifecycle(rex::cvar::Lifecycle::kInitOnly);
-REXCVAR_DEFINE_BOOL(banjo_d3d_api_resolve, false, "Katamari/Not built", "banjo-nx's PM4 renderer: Resolve markers (not in this port)")
+REXCVAR_DEFINE_BOOL(banjo_d3d_api_resolve, false, "Culdcept/Not built", "banjo-nx's PM4 renderer: Resolve markers (not in this port)")
     .lifecycle(rex::cvar::Lifecycle::kInitOnly);
-REXCVAR_DEFINE_BOOL(banjo_d3d_native_draw_indexed, false, "Katamari/Not built", "banjo-nx's PM4 renderer: native DrawIndexed (not in this port)")
+REXCVAR_DEFINE_BOOL(banjo_d3d_native_draw_indexed, false, "Culdcept/Not built", "banjo-nx's PM4 renderer: native DrawIndexed (not in this port)")
     .lifecycle(rex::cvar::Lifecycle::kInitOnly);
-REXCVAR_DEFINE_BOOL(banjo_d3d_native_draw_vertices, false, "Katamari/Not built", "banjo-nx's PM4 renderer: native DrawVertices (not in this port)")
+REXCVAR_DEFINE_BOOL(banjo_d3d_native_draw_vertices, false, "Culdcept/Not built", "banjo-nx's PM4 renderer: native DrawVertices (not in this port)")
     .lifecycle(rex::cvar::Lifecycle::kInitOnly);
 
 // Game frames presented (banjo-nx counted them in banjo_me_hooks.cpp's Swap hook): Renut's Present hook counts them
