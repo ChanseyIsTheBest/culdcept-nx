@@ -49,7 +49,7 @@ using namespace renut::gpu;
 // memory of resources N&B's code allocated itself.
 // katamari-nx: Beautiful Katamari's XMemFree is sub_824CAB98 (the hardware-device init frees with
 // `lis r4,0xB1800000; li r3,0; bl` to it where N&B's calls sub_822089F0).
-REX_IMPORT(__imp__sub_824CAB98, GameXMemFree, void(u32, u32));
+REX_IMPORT(__imp__sub_82357C60, GameXMemFree, void(u32, u32));
 // The kernel's physical memory, as XPhysicalAlloc / XPhysicalFree use it.
 REX_IMPORT(__imp__MmAllocatePhysicalMemoryEx, MmAllocatePhysicalMemoryEx,
            u32(u32, u32, u32, u32, u32, u32));
@@ -100,7 +100,7 @@ void FreeHeader(u32 va) {
 // Resource data: XMemAlloc's physical path for its attributes (0x822346A8:
 // the alignment from bits 24-27, the protection from bits 28-29), then
 // XPhysicalAlloc (0x826F1FB8), which asks the kernel. 0 on failure.
-constexpr u32 kGameNoLargePagesVa = 0x8315DFE0;  // XPhysicalAlloc drops MEM_LARGE_PAGES while set (katamari-nx: 0x82DA3778->0x8315DFE0)
+constexpr u32 kGameNoLargePagesVa = 0x83E323BC;  // culdcept-nx: XPhysicalAlloc sub_823582D0, its first reference;  // XPhysicalAlloc drops MEM_LARGE_PAGES while set (katamari-nx: 0x82DA3778->0x8315DFE0)
 
 u32 AllocPhysical(u32 size, u32 attributes) {
   static constexpr u32 kAlignment[16] = {4,    4,    4,     8,     16,    32,     64,     128,
@@ -125,7 +125,7 @@ void FreePhysical(u32 va) {
 
 // The GPU format table (word_82005200): per D3D format low 6 bits, bits per
 // pixel in the low byte, flags in the high one.
-constexpr u32 kFormatTable = 0x820FA9D0;  // katamari-nx: 0x82005200->0x820FA9D0
+constexpr u32 kFormatTable = 0x8214F720;  // culdcept-nx: Katamari's and Viva's 128 bytes, word for word (tools/d3d_data_addrs_culdcept.py);  // katamari-nx: 0x82005200->0x820FA9D0
 
 u16 FormatTableEntry(u32 format) {
   const auto *table = GuestPtr<const be_u16>(kFormatTable);
@@ -137,7 +137,7 @@ u32 FormatBitsPerPixel(u32 format) {
 }
 
 // The word at 0x82E108A0: set while a depth surface owns the HiZ memory.
-constexpr u32 kHiZOwnerVa = 0x8315E830;  // katamari-nx: 0x82E108A0->0x8315E830
+constexpr u32 kHiZOwnerVa = 0x83F40478;  // culdcept-nx: CreateSurface sub_82171AE0, Destroy sub_82171F20;  // katamari-nx: 0x82E108A0->0x8315E830
 
 u32 LoadU32(u32 va) {
   const auto *p = GuestPtr<const be_u32>(va);
@@ -1712,50 +1712,55 @@ u32 AddRefResource(u32 resource) {
   return AddRef(resource);
 }
 
+// pacman-nx; this game's call is sub_821828F0 at 0x8246B780: CreateTexture(w, h, 1, 1, 0, format, 0, 3).
+u32 CreateFrontBufferTexture(u32 width, u32 height, u32 format) {
+  return D3DDevice_CreateTexture_hook(width, height, 1, 1, 0, format, 0, 3);
+}
+
 } // namespace renut::gpu::native
 
-BANJO_RENUT_HOOK(sub_824D23F8, D3DDevice_CreateSurface_hook);  // D3DDevice_CreateSurface  // katamari-nx: N&B sub_8263EB88, D3DDevice_CreateSurface: InitializePresentationParameters calls it twice for the auto surfaces, as N&B's; sig 0.61/0.41
-BANJO_RENUT_HOOK(sub_824DB028, D3DResource_Destroy_hook);  // D3DResource_Destroy  // katamari-nx: N&B sub_821D7A00, D3DResource_Destroy: HiZ owner 0x8315E830 (N&B 0x82E108A0), VdGlobalDevice record 0x82000750; sig 0.59/0.33
-BANJO_RENUT_HOOK(sub_824DB448, D3D_UnlockResource_hook);  // D3D_UnlockResource  // katamari-nx: N&B sub_8263D360, D3D_UnlockResource: sig 0.61/0.26
-BANJO_RENUT_HOOK(sub_824DB7B0, D3DVertexBuffer_Unlock_hook);  // D3DVertexBuffer_Unlock  // katamari-nx: N&B sub_8263D638, signature 1.00 (next 0.72)
-BANJO_RENUT_HOOK(sub_824D0700, D3DSurface_UnlockRect_hook);  // D3DSurface_UnlockRect  // katamari-nx: N&B sub_8263ED78, signature 1.00 (next 0.81)
-BANJO_RENUT_HOOK(sub_824DB210, LockResource_hook);  // D3D_LockResource  // katamari-nx: N&B sub_8263D060, D3D_LockResource: VdGlobalDevice record 0x82000750 twice (N&B 0x820007F8); sig 0.65/0.30
-BANJO_RENUT_HOOK(sub_824DB760, D3DVertexBuffer_Lock_hook);  // D3DVertexBuffer_Lock  // katamari-nx: N&B sub_8263D5E8, signature 0.94 (next 0.60)
-BANJO_RENUT_HOOK(sub_824DB870, D3DIndexBuffer_Lock_hook);  // D3DIndexBuffer_Lock  // katamari-nx: N&B sub_8263D6F8, signature 0.89 (next 0.64)
-BANJO_RENUT_HOOK(sub_824D1918, D3D_LockSurface_hook);  // D3D_LockSurface  // katamari-nx: N&B sub_8263E420, signature 0.92 (next 0.32)
-BANJO_RENUT_HOOK(sub_824D19E0, D3D_Lock2DSurface_hook);  // D3D_Lock2DSurface  // katamari-nx: N&B sub_8263E4E0, signature 0.89 (next 0.73)
-BANJO_RENUT_HOOK(sub_824D1A70, D3D_Lock3DSurface_hook);  // D3D_Lock3DSurface  // katamari-nx: N&B sub_8263E570, signature 0.91 (next 0.73)
-BANJO_RENUT_UNHOOKED_HOOK(sub_8263E958, D3DArrayTexture_LockRect_hook);  // D3DArrayTexture_LockRect  // katamari-nx: not hooked (D3DArrayTexture_LockRect: a one-instruction thunk, not identifiable by signature)
-BANJO_RENUT_HOOK(sub_824D2148, D3DLineTexture_LockRect_hook);  // D3DLineTexture_LockRect  // katamari-nx: N&B sub_8263EA50, signature 1.00 (next 0.67)
-BANJO_RENUT_HOOK(sub_824D25B8, D3DSurface_LockRect_hook);  // D3DSurface_LockRect  // katamari-nx: N&B sub_8263ECF0, signature 1.00 (next 0.86)
-BANJO_RENUT_HOOK(sub_824D2620, D3DVolume_LockBox_hook);  // D3DVolume_LockBox  // katamari-nx: N&B sub_8263ED58, signature 1.00 (next 0.86)
-BANJO_RENUT_UNHOOKED_HOOK(sub_8263EA48, D3D_Lock3DSurface_hook);  // D3D_Lock3DSurface_Thunk  // katamari-nx: not hooked (D3D_Lock3DSurface_Thunk: as above)
-BANJO_RENUT_HOOK(sub_824DB550, D3DResource_AddRef_hook);  // D3DResource_AddRef  // katamari-nx: N&B sub_821D7DB0, signature 1.00 (next 0.78)
-BANJO_RENUT_HOOK(sub_824DB5C8, D3DResource_Release_hook);  // D3DResource_Release  // katamari-nx: N&B sub_821D7C20, signature 1.00 (next 0.78)
-BANJO_RENUT_HOOK(sub_824DAF98, D3DResource_GetType_hook);  // D3DResource_GetType  // katamari-nx: N&B sub_821D7630, signature 1.00 (next 0.25)
-BANJO_RENUT_HOOK(sub_824D2520, D3DSurface_GetDesc_hook);  // D3DSurface_GetDesc  // katamari-nx: N&B sub_821D77C0, signature 1.00 (next 0.43)
-BANJO_RENUT_HOOK(sub_824D25D8, D3DVolume_GetDesc_hook);  // D3DVolume_GetDesc  // katamari-nx: N&B sub_8263ED10, signature 1.00 (next 0.67)
-BANJO_RENUT_HOOK(sub_824D1258, Get2DSurfaceDesc);  // D3D_Get2DSurfaceDesc  // katamari-nx: N&B sub_821D76C0, D3D_Get2DSurfaceDesc: sig 1.00 (the 3D form takes sub_824D1358 at 1.00)
-BANJO_RENUT_UNHOOKED_HOOK(sub_8263E970, Get2DSurfaceDesc);  // D3D_Get2DSurfaceDesc_Thunk  // katamari-nx: not hooked (D3D_Get2DSurfaceDesc_Thunk: as above)
-BANJO_RENUT_HOOK(sub_824D1358, Get3DSurfaceDesc);  // D3D_Get3DSurfaceDesc  // katamari-nx: N&B sub_8263DEA0, D3D_Get3DSurfaceDesc: sig 1.00
-BANJO_RENUT_UNHOOKED_HOOK(sub_8263E978, Get3DSurfaceDesc);  // D3D_Get3DSurfaceDesc_Thunk  // katamari-nx: not hooked (D3D_Get3DSurfaceDesc_Thunk: as above)
-BANJO_RENUT_HOOK(sub_824D0E90, LevelLayout_hook);  // D3D_GetLevelLayout  // katamari-nx: N&B sub_821D7260, signature 0.80 (next 0.43)
-BANJO_RENUT_HOOK(sub_824D1458, SubresourceLayout_hook);  // D3D_GetSubresourceLayout  // katamari-nx: N&B sub_8263DFA0, signature 0.88 (next 0.43)
-BANJO_RENUT_HOOK(sub_824D2080, D3DBaseTexture_GetLevelCount_hook);  // D3DBaseTexture_GetLevelCount  // katamari-nx: N&B sub_821BF500, signature 1.00 (next 0.46)
-BANJO_RENUT_UNHOOKED_HOOK(sub_8263E960, D3DArrayTexture_GetArraySize_hook);  // D3DArrayTexture_GetArraySize  // katamari-nx: not hooked (D3DArrayTexture_GetArraySize: no counterpart (sig 0.33))
-BANJO_RENUT_HOOK(sub_824D06E8, D3DArrayTexture_UnlockRect_hook);  // D3DArrayTexture_UnlockRect  // katamari-nx: N&B sub_8263E888, signature 1.00 (next 0.81)
-BANJO_RENUT_HOOK(sub_824DB8B8, D3DConstantBuffer_Unlock_hook);  // D3DConstantBuffer_Unlock  // katamari-nx: N&B sub_82237D70, signature 1.00 (next 0.72)
-BANJO_RENUT_HOOK(sub_824D2090, D3DTexture_GetSurfaceLevel_hook);  // D3DTexture_GetSurfaceLevel  // katamari-nx: N&B sub_821D7E28, D3DTexture_GetSurfaceLevel: (texture, level, out), frame 176; the three getters read in the image
-BANJO_RENUT_HOOK(sub_824D2160, D3DCubeTexture_GetCubeMapSurface_hook);  // D3DCubeTexture_GetCubeMapSurface  // katamari-nx: N&B sub_8263E8A0, D3DCubeTexture_GetCubeMapSurface: keeps a third argument (mr r28,r5: the face), frame 192
-BANJO_RENUT_HOOK(sub_824D2228, D3DVolumeTexture_GetVolumeLevel_hook);  // D3DVolumeTexture_GetVolumeLevel  // katamari-nx: N&B sub_8263E980, D3DVolumeTexture_GetVolumeLevel: sig 0.75/0.65, the third of the three
-BANJO_RENUT_HOOK(sub_824DB698, D3DDevice_CreateVertexBuffer_hook);  // D3DDevice_CreateVertexBuffer  // katamari-nx: N&B sub_8263D520, signature 0.89 (next 0.64)
-BANJO_RENUT_HOOK(sub_824DB7C0, D3DDevice_CreateIndexBuffer_hook);  // D3DDevice_CreateIndexBuffer  // katamari-nx: N&B sub_8263D648, signature 0.88 (next 0.64)
-BANJO_RENUT_HOOK(sub_824D22D8, D3DDevice_CreateTexture_hook);  // D3DDevice_CreateTexture  // katamari-nx: N&B sub_8263EA68, signature 0.89 (next 0.38)
-BANJO_RENUT_HOOK(sub_824D1B18, SetTextureHeader_hook);  // D3D_SetTextureHeader  // katamari-nx: N&B sub_8225C878, signature 0.91 (next 0.25)
-BANJO_RENUT_HOOK(sub_824D09C8, FindTextureSize_hook);  // D3D_FindTextureSize  // katamari-nx: N&B sub_82255DC0, signature 0.98 (next 0.45)
-BANJO_RENUT_HOOK(sub_824D0820, GetMaxMipLevels_hook);  // D3D_GetMaxMipLevels  // katamari-nx: N&B sub_8263DC20, signature 1.00 (next 0.21)
-BANJO_RENUT_HOOK(sub_824D0650, GetTextureDimensions_hook);  // D3D_GetTextureDimensions  // katamari-nx: N&B sub_821D7010, signature 1.00 (next 0.23)
-BANJO_RENUT_UNHOOKED_HOOK(sub_8263DCA8, GetGpuTextureDimensions_hook);  // D3D_GetGpuTextureDimensions  // katamari-nx: not hooked (D3D_GetGpuTextureDimensions: its best match sub_824D0650 is GetTextureDimensions' (1.00))
-BANJO_RENUT_HOOK(sub_824D0788, BlockSizeOfGpuFormat_hook);  // D3D_BlockSizeOfGpuFormat  // katamari-nx: N&B sub_821D70A8, signature 1.00 (next 0.26)
-BANJO_RENUT_HOOK(sub_824D08A8, AlignTextureDimensions_hook);  // D3D_AlignTextureDimensions  // katamari-nx: N&B sub_821D7140, signature 1.00 (next 0.29)
-BANJO_RENUT_HOOK(sub_824D0D38, GetMipTailLevelOffsetCoords_hook);  // D3D_GetMipTailLevelOffsetCoords  // katamari-nx: N&B sub_8263DD48, signature 0.95 (next 0.28)
+BANJO_RENUT_HOOK(sub_82171AE0, D3DDevice_CreateSurface_hook);  // culdcept-nx: Katamari sub_824D23F8; Viva 8245C670
+BANJO_RENUT_HOOK(sub_82171F20, D3DResource_Destroy_hook);  // culdcept-nx: Katamari sub_824DB028; Viva 8245CA78
+BANJO_RENUT_HOOK(sub_821723B0, D3D_UnlockResource_hook);  // culdcept-nx: Katamari sub_824DB448; Viva 8245CF08
+BANJO_RENUT_HOOK(sub_82172798, D3DVertexBuffer_Unlock_hook);  // culdcept-nx: Katamari sub_824DB7B0; Viva 8245D388
+BANJO_RENUT_UNHOOKED_HOOK(unlinked_824D0700, D3DSurface_UnlockRect_hook);  // culdcept-nx: Katamari sub_824D0700; not placed in this game: no Viva line
+BANJO_RENUT_HOOK(sub_82172120, LockResource_hook);  // culdcept-nx: Katamari sub_824DB210; Viva 8245CC78
+BANJO_RENUT_HOOK(sub_82172738, D3DVertexBuffer_Lock_hook);  // culdcept-nx: Katamari sub_824DB760; Viva 8245D328
+BANJO_RENUT_HOOK(sub_82172858, D3DIndexBuffer_Lock_hook);  // culdcept-nx: Katamari sub_824DB870; Viva 8245D448
+BANJO_RENUT_HOOK(sub_82171168, D3D_LockSurface_hook);  // culdcept-nx: Katamari sub_824D1918; Viva 8245BDB8 by signature 0.83 (next 0.28 sub_82181258)
+BANJO_RENUT_HOOK(sub_82171230, D3D_Lock2DSurface_hook);  // culdcept-nx: Katamari sub_824D19E0; Viva 8245BE80 by signature 0.80 (next 0.34 sub_821919A0)
+BANJO_RENUT_UNHOOKED_HOOK(unlinked_824D1A70, D3D_Lock3DSurface_hook);  // culdcept-nx: Katamari sub_824D1A70; not placed in this game: no Viva line
+BANJO_RENUT_UNHOOKED_HOOK(unlinked_8263E958, D3DArrayTexture_LockRect_hook);  // culdcept-nx: N&B sub_8263E958; not placed in this game: no Viva line
+BANJO_RENUT_HOOK(sub_821718F8, D3DLineTexture_LockRect_hook);  // culdcept-nx: Katamari sub_824D2148; Viva 8245C488
+BANJO_RENUT_UNHOOKED_HOOK(unlinked_824D25B8, D3DSurface_LockRect_hook);  // culdcept-nx: Katamari sub_824D25B8; not placed in this game: no Viva line
+BANJO_RENUT_UNHOOKED_HOOK(unlinked_824D2620, D3DVolume_LockBox_hook);  // culdcept-nx: Katamari sub_824D2620; not placed in this game: no Viva line
+BANJO_RENUT_UNHOOKED_HOOK(unlinked_8263EA48, D3D_Lock3DSurface_hook);  // culdcept-nx: N&B sub_8263EA48; not placed in this game: no Viva line
+BANJO_RENUT_HOOK(sub_821724C0, D3DResource_AddRef_hook);  // culdcept-nx: Katamari sub_824DB550; Viva 8245D0D8
+BANJO_RENUT_HOOK(sub_82172538, D3DResource_Release_hook);  // culdcept-nx: Katamari sub_824DB5C8; Viva 8245D150
+BANJO_RENUT_HOOK(sub_821725E0, D3DResource_GetType_hook);  // culdcept-nx: Katamari sub_824DAF98; Viva 8245D1D0
+BANJO_RENUT_HOOK(sub_82171C48, D3DSurface_GetDesc_hook);  // culdcept-nx: Katamari sub_824D2520; Viva 8245C7D8
+BANJO_RENUT_UNHOOKED_HOOK(unlinked_824D25D8, D3DVolume_GetDesc_hook);  // culdcept-nx: Katamari sub_824D25D8; not placed in this game: no Viva line
+BANJO_RENUT_HOOK(sub_82170C68, Get2DSurfaceDesc);  // culdcept-nx: Katamari sub_824D1258; Viva 8245B8B8
+BANJO_RENUT_UNHOOKED_HOOK(unlinked_8263E970, Get2DSurfaceDesc);  // culdcept-nx: N&B sub_8263E970; not placed in this game: Viva 8245B8B8
+BANJO_RENUT_UNHOOKED_HOOK(unlinked_824D1358, Get3DSurfaceDesc);  // culdcept-nx: Katamari sub_824D1358; not placed in this game: no Viva line
+BANJO_RENUT_UNHOOKED_HOOK(unlinked_8263E978, Get3DSurfaceDesc);  // culdcept-nx: N&B sub_8263E978; not placed in this game: no Viva line
+BANJO_RENUT_HOOK(sub_821708A0, LevelLayout_hook);  // culdcept-nx: Katamari sub_824D0E90; Viva 8245B4F0
+BANJO_RENUT_HOOK(sub_82170CF8, SubresourceLayout_hook);  // culdcept-nx: Katamari sub_824D1458; Viva 8245B948
+BANJO_RENUT_UNHOOKED_HOOK(unlinked_824D2080, D3DBaseTexture_GetLevelCount_hook);  // culdcept-nx: Katamari sub_824D2080; not placed in this game: Viva 8245C478 not paired
+BANJO_RENUT_UNHOOKED_HOOK(unlinked_8263E960, D3DArrayTexture_GetArraySize_hook);  // culdcept-nx: N&B sub_8263E960; not placed in this game: no Viva line
+BANJO_RENUT_HOOK(sub_82171910, D3DArrayTexture_UnlockRect_hook);  // culdcept-nx: Katamari sub_824D06E8; Viva 8245C4A0
+BANJO_RENUT_HOOK(sub_821728B8, D3DConstantBuffer_Unlock_hook);  // culdcept-nx: Katamari sub_824DB8B8; Viva 8245D4A8
+BANJO_RENUT_UNHOOKED_HOOK(unlinked_824D2090, D3DTexture_GetSurfaceLevel_hook);  // culdcept-nx: Katamari sub_824D2090; not placed in this game: no Viva line
+BANJO_RENUT_UNHOOKED_HOOK(unlinked_824D2160, D3DCubeTexture_GetCubeMapSurface_hook);  // culdcept-nx: Katamari sub_824D2160; not placed in this game: no Viva line
+BANJO_RENUT_UNHOOKED_HOOK(unlinked_824D2228, D3DVolumeTexture_GetVolumeLevel_hook);  // culdcept-nx: Katamari sub_824D2228; not placed in this game: no Viva line
+BANJO_RENUT_HOOK(sub_82172670, D3DDevice_CreateVertexBuffer_hook);  // culdcept-nx: Katamari sub_824DB698; Viva 8245D260
+BANJO_RENUT_HOOK(sub_821727A8, D3DDevice_CreateIndexBuffer_hook);  // culdcept-nx: Katamari sub_824DB7C0; Viva 8245D398
+BANJO_RENUT_HOOK(sub_821719C0, D3DDevice_CreateTexture_hook);  // culdcept-nx: Katamari sub_824D22D8; Viva 8245C550
+BANJO_RENUT_HOOK(sub_821712C0, SetTextureHeader_hook);  // culdcept-nx: Katamari sub_824D1B18; Viva 8245BF10
+BANJO_RENUT_HOOK(sub_82170338, FindTextureSize_hook);  // culdcept-nx: Katamari sub_824D09C8; Viva 8245AF88
+BANJO_RENUT_HOOK(sub_82170190, GetMaxMipLevels_hook);  // culdcept-nx: Katamari sub_824D0820; Viva 8245ADE0
+BANJO_RENUT_HOOK(sub_821706B0, GetTextureDimensions_hook);  // culdcept-nx: Katamari sub_824D0650; Viva 8245B300
+BANJO_RENUT_UNHOOKED_HOOK(unlinked_8263DCA8, GetGpuTextureDimensions_hook);  // culdcept-nx: N&B sub_8263DCA8; not placed in this game: no Viva line
+BANJO_RENUT_HOOK(sub_82170070, BlockSizeOfGpuFormat_hook);  // culdcept-nx: Katamari sub_824D0788; Viva 8245ACC0
+BANJO_RENUT_HOOK(sub_82170218, AlignTextureDimensions_hook);  // culdcept-nx: Katamari sub_824D08A8; Viva 8245AE68
+BANJO_RENUT_HOOK(sub_82170748, GetMipTailLevelOffsetCoords_hook);  // culdcept-nx: Katamari sub_824D0D38; Viva 8245B398

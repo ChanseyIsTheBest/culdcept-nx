@@ -148,7 +148,7 @@ target_compile_definitions(renut PRIVATE BANJO_RENUT_RENDERER=1)
 # docs/katamari-notes.md) are registered in this build; OFF compiles them unregistered (banjo_renut_select.h).
 # culdcept-nx: OFF until Renut's hooks are at Culdcept Saga's functions (docs/culdcept-notes.md, "Renut at this
 # game's addresses"): the handlers compile, no guest function is overridden.
-option(CULDCEPT_RENUT_HOOKS "Register Renut's hooks at Culdcept Saga's functions" OFF)
+option(CULDCEPT_RENUT_HOOKS "Register Renut's hooks at Culdcept Saga's functions" ON)
 if(CULDCEPT_RENUT_HOOKS)
     target_compile_definitions(banjo_renut_gpu PRIVATE CULDCEPT_RENUT_HOOKS=1)
     target_compile_definitions(renut PRIVATE CULDCEPT_RENUT_HOOKS=1)

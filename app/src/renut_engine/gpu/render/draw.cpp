@@ -536,11 +536,11 @@ inline void CountReuse(int what, bool reused) {
   }
 }
 // banjo-nx (2026-10-26, Unleashed-style step 1): the fields the reuse tests stand for are the byte ranges they tested.
-static_assert(FieldsOfRange(10112, 10600 - 10112) == (kFieldBools | kFieldDest | kFieldViewPackets));
-static_assert(FieldsOfRange(10432, 10600 - 10432) == kFieldViewPackets && FieldOfOffset(0x29C0) == kField29C0 &&
+static_assert(FieldsOfRange(9984, 10472 - 9984) == (kFieldBools | kFieldDest | kFieldViewPackets));
+static_assert(FieldsOfRange(10304, 10472 - 10304) == kFieldViewPackets && FieldOfOffset(0x2940) == kField29C0 &&
               FieldOfOffset(d3d::kDeviceOffsetPredication) == kFieldPredication);
 static_assert(FieldsOfRange(d3d::kDeviceOffsetRenderTargets, 20) == kFieldTargets &&
-              FieldsOfRange(1152, 1776 - 1152) == kFieldFetch &&
+              FieldsOfRange(1024, 1648 - 1024) == kFieldFetch &&  // culdcept-nx (vivapinata-nx's): 128 below Katamari's
               FieldsOfRange(d3d::kDeviceOffsetTextures, 4 * d3d::kTextureFetchSlots) == kFieldTexWords);
 // banjo-nx (2026-10-26): banjo_renut_chain_reuse as configured, and not in the off half of its in-run A/B (target 20).
 inline bool ChainReuseOn() {
@@ -2919,7 +2919,7 @@ ViewportState ComputeViewport(const GuestDevice &device, const Targets &t) {
   key[8] = dev.m_WindowPacket.WindowOffset;
   key[9] = dev.m_WindowPacket.WindowScissorTL;
   key[10] = dev.m_WindowPacket.WindowScissorBR;
-  key[11] = device.U32(0x29C0);
+  key[11] = device.U32(0x2940);  // culdcept-nx: 128 below Katamari's
   key[12] = u32(one_tile) | (banjo::renut_gpu::HalfPixelOffsetOn() ? 2u : 0u);
   key[13] = one_tile ? u32(tile.x1) : 0;
   key[14] = one_tile ? u32(tile.y1) : 0;
@@ -3030,7 +3030,7 @@ ViewportState ComputeViewportSlow(const GuestDevice &device, const Targets &t) {
   // above 1x put the game's full-screen quads (edges on the guest's pixel centres) past the centres of the host's top
   // row and left column, which were never drawn (the docked white line at 1.25x and 1.5x); at 1x the same as before.
   const float pixel_center =
-      (banjo::renut_gpu::HalfPixelOffsetOn() && !(device.U32(0x29C0) & 1)) ? 0.5f / t.scale.Factor() : 0.0f;
+      (banjo::renut_gpu::HalfPixelOffsetOn() && !(device.U32(0x2940) & 1)) ? 0.5f / t.scale.Factor() : 0.0f;  // culdcept-nx: Katamari's 0x29C0->0x2940 (moved twice by the port tools before: fixed)
   // SetViewport's rectangle back from its scale and offset: x = offset - scale
   // and width = 2 * scale; y = offset + scale and height = -2 * scale (the
   // scale is negative: y goes down).
@@ -9429,7 +9429,7 @@ VertexDeclarationRecord &NoDeclaration() {
 // Its D3DVERTEXELEMENT9s (12 bytes each, ended by D3DDECL_END) are at +52 of the declaration, inside the device
 // snapshot, so a draw reads them from its own snapshot; at most 15 before the device's next field (+0x3088). One record
 // per distinct element list; each new list is logged once with its elements, to check the layout.
-constexpr u32 kDeviceDeclarationOffset = 0x2F98;
+constexpr u32 kDeviceDeclarationOffset = 0x2E90;  // culdcept-nx: sub_82182688 `stw r?,11920(r31)`
 constexpr u32 kDeclarationElementsOffset = 52;
 constexpr u32 kDeviceDeclarationMaxElements = 15;
 
@@ -10188,7 +10188,7 @@ std::unordered_map<const void *, std::unordered_map<uint64_t, u32>> g_census_lef
 constexpr u32 kCensusFetchBegin = u32(offsetof(d3d::Device, m_Constants));
 constexpr u32 kCensusFloatBegin = kCensusFetchBegin + u32(offsetof(d3d::Constants, VertexShaderF));
 constexpr u32 kCensusTailBegin = kCensusFetchBegin + u32(offsetof(d3d::Constants, VertexShaderB));
-static_assert(kCensusTailBegin < 10880 && 11776 < d3d::kDeviceSnapshotSize);  // katamari-nx: a chunk boundary (backend/queued.cpp)
+static_assert(kCensusTailBegin < 10752 && 11520 < d3d::kDeviceSnapshotSize);  // katamari-nx: a chunk boundary (backend/queued.cpp)
 
 bool CensusCompared(u32 k) {  // g_census[k + 1] is frame N-(k+1)
   return g_census[0].frame != UINT64_MAX && g_census[k + 1].frame != UINT64_MAX &&
@@ -10242,8 +10242,8 @@ void CensusDraw(const u8 *device_state, const DrawCall &call, const Targets &tar
   CensusFrame &cur = g_census[0];
   // The state key.
   uint64_t state = XXH3_64bits(device_state + kCensusFetchBegin, kCensusFloatBegin - kCensusFetchBegin);
-  state = XXH3_64bits_withSeed(device_state + kCensusTailBegin, 10880 - kCensusTailBegin, state);
-  state = XXH3_64bits_withSeed(device_state + 11776, d3d::kDeviceSnapshotSize - 11776, state);  // katamari-nx: a chunk boundary (backend/queued.cpp)
+  state = XXH3_64bits_withSeed(device_state + kCensusTailBegin, 10752 - kCensusTailBegin, state);
+  state = XXH3_64bits_withSeed(device_state + 11520, d3d::kDeviceSnapshotSize - 11520, state);  // katamari-nx: a chunk boundary (backend/queued.cpp)
   const u32 call_words[6] = {call.primitive, call.start_index, call.start_vertex, call.count, u32(call.base_vertex),
                              u32(call.indexed) | u32(call.tessellation) << 1 | u32(call.up_vertices != nullptr) << 2 |
                                  u32(call.up_indices != nullptr) << 3};
@@ -10828,7 +10828,7 @@ void SetSampleMaskLocked(plume::RenderCommandList *cmd, const GuestDevice &devic
   const u32 samples = first ? u32(first->samples) : 1u;
   u32 mask = 0xFFFFu;
   if (samples > 1) {
-    const u32 aa = device.U32(0x2A00) & 0xFFFFu;
+    const u32 aa = device.U32(0x2980) & 0xFFFFu;  // culdcept-nx: 0x2a00->0x2980
     const u32 all = (1u << samples) - 1u;
     mask = (aa | aa >> 4 | aa >> 8 | aa >> 12) & all;
     if (mask == all)
@@ -15842,7 +15842,7 @@ plume::RenderRect ClampRect(const ClearRect *rect, uint32_t width, uint32_t heig
 void ReadClearViewport(const u8 *device_state, float viewport[4]) {  // blur-nx (2026-11-13, #55)
   const GuestDevice device(device_state);
   for (u32 i = 0; i < 4; ++i)
-    viewport[i] = device.F32(kClearViewportOffset + i * 4);
+    viewport[i] = float(int32_t(device.U32(kClearViewportOffset + i * 4)));  // culdcept-nx (vivapinata-nx 24da6e4f): integers in this XDK
 }
 
 void ClearStateLocked(const u8 *device_state, u32 flags, const ClearRect *rect,

@@ -222,31 +222,32 @@ enum DrawField : u32 {
   kFieldsAll = (1u << 18) - 1,
 };
 constexpr u32 FieldOfOffset(u32 at) {
-  if (at < 0x480)
+  // culdcept-nx: every boundary 128 bytes below Katamari's (the constants at 0x400).
+  if (at < 0x400)
     return 0;
-  if (at < 0x6F0)
+  if (at < 0x670)
     return kFieldFetch;
-  if (at < 0x780)
+  if (at < 0x700)
     return kFieldVertexFetch;
-  if (at < 0x2780)
+  if (at < 0x2700)
     return 0;  // the float constants: by group (m_Pending)
-  if (at < 0x2880)
+  if (at < 0x2800)
     return kFieldBools;
-  if (at < 0x28C0)
+  if (at < 0x2840)
     return kFieldDest;
-  if (at < 0x2968)
+  if (at < 0x28E8)
     return kFieldViewPackets;
-  if (at >= 0x29C0 && at < 0x29C4)
+  if (at >= 0x2940 && at < 0x2944)
     return kField29C0;
-  if (at < 0x2A80)
+  if (at < 0x2A00)
     return kFieldMisc;
   // Title update 3's CDevice (banjo-nx 2026-10-29): 4 bytes more from 0x2AC0 and 8 from 0x2E30 (the base's 0x2E2C),
   // the same from 0x3390 (d3d.h); the base's boundaries in the comments of DrawField moved with their fields.
-  if (at < 0x2DF8)  // katamari-nx: 0x2E04->0x2DF8
+  if (at < 0x2CE8)  // katamari-nx: 0x2E04->0x2DF8 (culdcept-nx: 0x2DF8->0x2CE8)
     return kFieldUnread;
   if (at >= d3d::kDeviceOffsetVertexDeclaration && at < d3d::kDeviceOffsetVertexDeclaration + 4)
     return kFieldDecl;
-  if (at < 0x2EF8)  // katamari-nx: 0x2F08->0x2EF8
+  if (at < 0x2DF0)  // katamari-nx: 0x2F08->0x2EF8 (culdcept-nx: 0x2EF8->0x2DF0)
     return kFieldPrivate;
   if (at < d3d::kDeviceOffsetIndexBuffer)
     return kFieldTail;
@@ -258,7 +259,7 @@ constexpr u32 FieldOfOffset(u32 at) {
     return kFieldStreams;
   if (at < d3d::kDeviceOffsetTextures + 4 * d3d::kTextureFetchSlots)
     return kFieldTexWords;
-  if (at < 0x317C)  // katamari-nx: 0x318C->0x317C
+  if (at < 0x3070)  // katamari-nx: 0x318C->0x317C (culdcept-nx: 0x317C->0x3070)
     return kFieldTail;
   if (at < d3d::kDeviceOffsetPixelShader)
     return kFieldScissor;
@@ -294,8 +295,8 @@ extern ChainHint g_chain_hint;
 // and marks every chunk changed. banjo-nx (2026-10-27, render thread night): inline (a call into draw.cpp a draw).
 inline uint64_t g_chain_seq_counter = 1;  // the first hint is 2
 inline uint64_t NextChainSeq() { return ++g_chain_seq_counter; }
-constexpr u32 kChainHeadChunks = 30;
-constexpr u32 kChainTailBegin = 10112;
+constexpr u32 kChainHeadChunks = 28;  // culdcept-nx: the float constants at 0x700
+constexpr u32 kChainTailBegin = 9984;  // culdcept-nx: VertexShaderB at 0x2700
 // The chain chunk of a device byte outside the float constants.
 constexpr u32 ChainChunkOf(u32 device_offset) {
   return device_offset < kChainTailBegin ? device_offset / 64 : kChainHeadChunks + (device_offset - kChainTailBegin) / 64;

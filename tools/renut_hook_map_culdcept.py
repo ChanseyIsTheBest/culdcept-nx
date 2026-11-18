@@ -23,6 +23,9 @@ import re
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 LINE = re.compile(r'^\s*BANJO_RENUT_(UNHOOKED_)?HOOK(_RAW)?(_SHARED)?\(\s*sub_([0-9A-F]{8})\s*(?:,\s*([A-Za-z_]\w*))?')
 NOTE = re.compile(r'(Katamari|N&B) sub_([0-9A-F]{8})')
+STATE = re.compile(r'(Set|Get)(Render|Sampler)StateHook<(\d+)>')
+TGT_RENDER, TGT_SAMPLER = 0x828B7500, 0x828B7990  # tools/renut_state_tables.py
+import struct
 
 
 def lines_of(tree):
@@ -86,6 +89,7 @@ def main():
             if sc and sc[0][0] >= 0.70 and (len(sc) < 2 or sc[0][0] - sc[1][0] >= 0.05):
                 sig[v] = (sc[0][1][4:], f"Viva {v} by signature {sc[0][0]:.2f} (next {sc[1][0]:.2f} {sc[1][1]})")
             print(f'  sigmatch Viva {v}: ' + ', '.join(f'{k} {x:.2f}' for x, k in sc))
+    img = open(os.path.join(ROOT, 'out', 'renut_image.bin'), 'rb').read()
     result = {}
     stats = {}
     for b in base:
@@ -95,8 +99,19 @@ def main():
             same = by_handler.get((b['handler'], b['raw']), [])
             if len(same) == 1:  # a generic handler (the state tables' Set/GetRenderStateHook) matches only by its note
                 cands = same
+        st = STATE.search(b['text'])
         if b['addr'] in hand:
             tgt, why = hand[b['addr']], 'hand list'
+        elif st:
+            # The state tables' hooks straight from Culdcept's own tables ({getter, setter, default} rows): row N's
+            # setter or getter. Rows 97-100 (HiZWriteEnable, LastPixel, LineWidth, Buffer2Frames) are not in this XDK.
+            kind, which, row = st.group(1), st.group(2), int(st.group(3))
+            tab, rows = (TGT_RENDER, 97) if which == 'Render' else (TGT_SAMPLER, 20)
+            if row < rows:
+                w = struct.unpack_from('>3I', img, tab - 0x82000000 + 12 * row)
+                tgt, why = f"{w[1] if kind == 'Set' else w[0]:08X}", f'{which.lower()} state table row {row} ({kind.lower()}ter)'
+            else:
+                tgt, why = None, f'{which.lower()} state {row}: not in this XDK\'s table'
         elif not cands:
             tgt, why = None, 'no Viva line'
         else:

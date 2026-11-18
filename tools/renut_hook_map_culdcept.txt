@@ -1,0 +1,20 @@
+# culdcept-nx: hand answers for tools/renut_hook_map_culdcept.py: <base line's address (Katamari / N&B)> <Culdcept address or -> <evidence>
+# A "-" leaves the line unhooked. These win over the routes.
+
+# IsFencePending: inlined here (LTCG). sub_82183368 at 0x821833E4 reads the VdGlobalDevice record (lwz 1968), the device's
+# fence word (lwz 10780) and calls KickOff sub_82174278 itself; the pairing's answer 82174278 is KickOff (unique shape).
+824E03D0 - IsFencePending inlined into sub_82183368
+
+# GetRenderState's Wrap10-15 rows (70-75) all point at 0x82400F98, `li r3,0; blr`, a body the linker folded with game
+# functions of the same two instructions: hooking it would run the render-state getter for every one of them.
+824DCDB0 - folded return-0 body 0x82400F98 shared with game code
+824DCDC0 - folded return-0 body 0x82400F98 shared with game code
+824DCDD0 - folded return-0 body 0x82400F98 shared with game code
+824DCDE0 - folded return-0 body 0x82400F98 shared with game code
+824DCDF0 - folded return-0 body 0x82400F98 shared with game code
+824DCE00 - folded return-0 body 0x82400F98 shared with game code
+
+# BeginTiling (the raw hook): sub_8218CD20 stores the tile count, `stw r5,12472(r31)` (Katamari's TileCount, -268), and is
+# called once by the game (0x82380804), EndTiling sub_8218D230 once (0x82382F58). Viva's 82462B58 scored 0.68 by signature,
+# under the map's 0.70; without it only the first tile (the left half of the title) came out.
+824EFBC8 8218CD20 BeginTiling

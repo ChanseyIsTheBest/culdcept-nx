@@ -28,34 +28,34 @@ constexpr u32 kPendingMisc = 4;     // m_MiscPacket and friends
 
 // Render state storage in the CDevice-private area (TU3: 8 bytes further on
 // than the first release from 0x2E30 to 0x3390, 4 from 0x2AC0).
-constexpr u32 kBlendState = 0x2E40;       // D3D blend: src 0-4, op 5-7, dest 8-12, alpha at 16+ (katamari-nx: 0x2E50->0x2E40)
-constexpr u32 kBlendFlags = 0x2E44;       // 31 blend enable, 30 separate alpha, HiZ fields (katamari-nx: 0x2E54->0x2E44)
-constexpr u32 kScissorTestEnable = 0x2E48;  // katamari-nx: 0x2E58->0x2E48
-constexpr u32 kColorWriteEnable = 0x2E4C;  // [4] (katamari-nx: 0x2E5C->0x2E4C)
-constexpr u32 kZEnable = 0x2E5C;  // katamari-nx: 0x2E6C->0x2E5C
-constexpr u32 kStencilEnable = 0x2E60;  // katamari-nx: 0x2E70->0x2E60
-constexpr u32 kPointSpriteEnable = 0x2E64;  // katamari-nx: 0x2E74->0x2E64
-constexpr u32 kPointSize = 0x2E6C;  // katamari-nx: 0x2E7C->0x2E6C
-constexpr u32 kPointSizeMin = 0x2E70;  // katamari-nx: 0x2E80->0x2E70
-constexpr u32 kPointSizeMax = 0x2E74;  // katamari-nx: 0x2E84->0x2E74
-constexpr u32 kHighPrecisionBlend = 0x2EF4;  // [4] (katamari-nx: 0x2F04->0x2EF4)
-constexpr u32 kPresentInterval = 0x3504;  // katamari-nx: 0x351C->0x3504
-constexpr u32 kBehaviorFlags2 = 0x56F8;  // katamari-nx: 0x5DAC->0x56F8
+constexpr u32 kBlendState = 0x2D38;       // D3D blend: src 0-4, op 5-7, dest 8-12, alpha at 16+ (katamari-nx: 0x2E50->0x2E40) (culdcept-nx: 0x2E40->0x2D38)
+constexpr u32 kBlendFlags = 0x2D3C;       // 31 blend enable, 30 separate alpha, HiZ fields (katamari-nx: 0x2E54->0x2E44) (culdcept-nx: 0x2E44->0x2D3C)
+constexpr u32 kScissorTestEnable = 0x2D40;  // katamari-nx: 0x2E58->0x2E48 (culdcept-nx: 0x2E48->0x2D40)
+constexpr u32 kColorWriteEnable = 0x2D44;  // [4] (katamari-nx: 0x2E5C->0x2E4C) (culdcept-nx: 0x2E4C->0x2D44)
+constexpr u32 kZEnable = 0x2D54;  // katamari-nx: 0x2E6C->0x2E5C (culdcept-nx: 0x2E5C->0x2D54)
+constexpr u32 kStencilEnable = 0x2D58;  // katamari-nx: 0x2E70->0x2E60 (culdcept-nx: 0x2E60->0x2D58)
+constexpr u32 kPointSpriteEnable = 0x2D5C;  // katamari-nx: 0x2E74->0x2E64 (culdcept-nx: 0x2E64->0x2D5C)
+constexpr u32 kPointSize = 0x2D64;  // katamari-nx: 0x2E7C->0x2E6C (culdcept-nx: 0x2E6C->0x2D64)
+constexpr u32 kPointSizeMin = 0x2D68;  // katamari-nx: 0x2E80->0x2E70 (culdcept-nx: 0x2E70->0x2D68)
+constexpr u32 kPointSizeMax = 0x2D6C;  // katamari-nx: 0x2E84->0x2E74 (culdcept-nx: 0x2E74->0x2D6C)
+constexpr u32 kHighPrecisionBlend = 0x2DEC;  // [4] (katamari-nx: 0x2F04->0x2EF4) (culdcept-nx: 0x2EF4->0x2DEC)
+constexpr u32 kPresentInterval = 0x33A4;  // katamari-nx: 0x351C->0x3504 (culdcept-nx: 0x3504->0x33A4)
+constexpr u32 kBehaviorFlags2 = 0x4FC0;  // katamari-nx: 0x5DAC->0x56F8 (culdcept-nx: 0x56F8->0x4FC0)
 // Sampler state storage, a byte per sampler.
-constexpr u32 kMaxAnisotropy = 0x2E8C;  // katamari-nx: 0x2E9C->0x2E8C
-constexpr u32 kMaxMipLevel = 0x2EA6;  // katamari-nx: 0x2EB6->0x2EA6
-constexpr u32 kMinMipLevel = 0x2EC0;  // katamari-nx: 0x2ED0->0x2EC0
-constexpr u32 kZFilter = 0x2EDA;  // bit 0 mag, 1 min, 2 separate Z filtering (katamari-nx: 0x2EEA->0x2EDA)
+constexpr u32 kMaxAnisotropy = 0x2D84;  // katamari-nx: 0x2E9C->0x2E8C (culdcept-nx: 0x2E8C->0x2D84)
+constexpr u32 kMaxMipLevel = 0x2D9E;  // katamari-nx: 0x2EB6->0x2EA6 (culdcept-nx: 0x2EA6->0x2D9E)
+constexpr u32 kMinMipLevel = 0x2DB8;  // katamari-nx: 0x2ED0->0x2EC0 (culdcept-nx: 0x2EC0->0x2DB8)
+constexpr u32 kZFilter = 0x2DD2;  // bit 0 mag, 1 min, 2 separate Z filtering (katamari-nx: 0x2EEA->0x2EDA) (culdcept-nx: 0x2EDA->0x2DD2)
 // Viewport (SetViewport's arguments, clamped) and the register image values.
-constexpr u32 kViewport = 0x3160;  // x, y, width, height, min z, max z, 0 (katamari-nx: 0x3170->0x3160)
-constexpr u32 kVportXScale = 0x2908;
-constexpr u32 kVportZScale = 0x2918;
-constexpr u32 kStreamDeclStrides = 0x2E30;  // u8[16] (katamari-nx: 0x2E40->0x2E30)
-constexpr u32 kVertexDeclaration = 0x2E24;  // katamari-nx: 0x2E30->0x2E24
-constexpr u32 kVertexShader = 0x3190;  // katamari-nx: 0x31A0->0x3190
-constexpr u32 kPixelShader = 0x318C;  // katamari-nx: 0x319C->0x318C
-constexpr u32 kGprAllocation = 0x2AA8;
-constexpr u32 kScreenExtentQueryMode = 0x2AA4;
+constexpr u32 kViewport = 0x3058;  // x, y, width, height, min z, max z, 0 (katamari-nx: 0x3170->0x3160) (culdcept-nx: 0x3160->0x3058)
+constexpr u32 kVportXScale = 0x2888;  // culdcept-nx: 0x2908->0x2888
+constexpr u32 kVportZScale = 0x2898;  // culdcept-nx: 0x2918->0x2898
+constexpr u32 kStreamDeclStrides = 0x2D20;  // u8[16] (katamari-nx: 0x2E40->0x2E30) (culdcept-nx: 0x2E30->0x2D20)
+constexpr u32 kVertexDeclaration = 0x2D10;  // katamari-nx: 0x2E30->0x2E24 (culdcept-nx: 0x2E24->0x2D10)
+constexpr u32 kVertexShader = 0x3084;  // katamari-nx: 0x31A0->0x3190 (culdcept-nx: 0x3190->0x3084)
+constexpr u32 kPixelShader = 0x3080;  // katamari-nx: 0x319C->0x318C (culdcept-nx: 0x318C->0x3080)
+constexpr u32 kGprAllocation = 0x2A28;  // culdcept-nx: 0x2aa8->0x2a28
+constexpr u32 kScreenExtentQueryMode = 0x2A24;  // culdcept-nx: 0x2aa4->0x2a24
 
 constexpr float kInv255 = 0.003921568859368563f;  // flt_82000D08
 
@@ -176,10 +176,10 @@ void RsSeparateAlphaBlendEnable(Device d, u32 v) {  // 0x821F96C0
   StoreBlendControl(d, control, true);
 }
 void RsBlendFactor(Device d, u32 v) {  // 0x8223D118
-  d.SetF(0x28E8, float(v & 0xFF) * kInv255);           // blue
-  d.SetF(0x28E4, float((v >> 8) & 0xFF) * kInv255);    // green
-  d.SetF(0x28E0, float((v >> 16) & 0xFF) * kInv255);   // red
-  d.SetF(0x28EC, float(v >> 24) * kInv255);            // alpha
+  d.SetF(0x2868, float(v & 0xFF) * kInv255);           // blue culdcept-nx: 0x28e8->0x2868
+  d.SetF(0x2864, float((v >> 8) & 0xFF) * kInv255);    // green culdcept-nx: 0x28e4->0x2864
+  d.SetF(0x2860, float((v >> 16) & 0xFF) * kInv255);   // red culdcept-nx: 0x28e0->0x2860
+  d.SetF(0x286C, float(v >> 24) * kInv255);            // alpha culdcept-nx: 0x28ec->0x286c
   d.Dirty(kPendingStates, u64(0xF) << 33);
 }
 void RsSrcBlend(Device d, u32 v) {  // 0x821FF1D0
@@ -205,7 +205,7 @@ void RsAlphaTestEnable(Device d, u32 v) {  // 0x82635498
   d.Dirty(kPendingStates, 0x200 | 0x40000);
 }
 void RsAlphaRef(Device d, u32 v) {  // 0x82635550
-  d.SetF(0x2904, float(v) * kInv255);
+  d.SetF(0x2884, float(v) * kInv255);  // culdcept-nx: 0x2904->0x2884
   d.Dirty(kPendingStates, 0x8000000);
 }
 void RsAlphaFunc(Device d, u32 v) {  // 0x826355B8
@@ -231,44 +231,44 @@ void RsTwoSidedStencilMode(Device d, u32 v) {  // 0x82635800
   d.Dirty(kPendingStates, 0x800 | 0x20000);
 }
 void RsStencilRef(Device d, u32 v) {  // 0x826359D8
-  d.SetB(0x2903, u8(v));
+  d.SetB(0x2883, u8(v));  // culdcept-nx: 0x2903->0x2883
   d.Dirty(kPendingStates, 0x10000000);
 }
 void RsStencilMask(Device d, u32 v) {  // 0x826359F8
-  d.SetB(0x2902, u8(v));
+  d.SetB(0x2882, u8(v));  // culdcept-nx: 0x2902->0x2882
   d.Dirty(kPendingStates, 0x10000000);
 }
 void RsStencilWriteMask(Device d, u32 v) {  // 0x82635A18
-  d.SetB(0x2901, u8(v));
+  d.SetB(0x2881, u8(v));  // culdcept-nx: 0x2901->0x2881
   d.Dirty(kPendingStates, 0x10000000);
 }
 void RsCCWStencilRef(Device d, u32 v) {  // 0x82635A38
-  d.SetB(0x28FF, u8(v));
+  d.SetB(0x287F, u8(v));  // culdcept-nx: 0x28ff->0x287f
   d.Dirty(kPendingStates, 0x20000000);
 }
 void RsCCWStencilMask(Device d, u32 v) {  // 0x82635A58
-  d.SetB(0x28FE, u8(v));
+  d.SetB(0x287E, u8(v));  // culdcept-nx: 0x28fe->0x287e
   d.Dirty(kPendingStates, 0x20000000);
 }
 void RsCCWStencilWriteMask(Device d, u32 v) {  // 0x82635A78
-  d.SetB(0x28FD, u8(v));
+  d.SetB(0x287D, u8(v));  // culdcept-nx: 0x28fd->0x287d
   d.Dirty(kPendingStates, 0x20000000);
 }
 void RsClipPlaneEnable(Device d, u32 v) {  // 0x8225D188
   d.SetW(off::ClipControl, (d.W(off::ClipControl) & ~0x3Fu) | v);
-  d.SetW(0x28B4, v ? 0x1000u : 0u);
+  d.SetW(0x2834, v ? 0x1000u : 0u);  // culdcept-nx: 0x28b4->0x2834
   d.Dirty(kPendingStates, 0x80 | Bit(44));
 }
 void RsPointSize(Device d, u32 v) {  // 0x82635CC0
   d.SetW(kPointSize, v);
   const u16 size = u16(TruncateToI32(AsFloat(v) * 8.0f));
-  d.SetH(0x2966, size);
-  d.SetH(0x2964, size);
+  d.SetH(0x28E6, size);  // culdcept-nx: 0x2966->0x28e6
+  d.SetH(0x28E4, size);  // culdcept-nx: 0x2964->0x28e4
   d.Dirty(kPendingFetch, Bit(54));
 }
 void RsPointSizeMin(Device d, u32 v) {  // 0x82635D20
   d.SetW(kPointSizeMin, v);
-  d.SetH(0x296A, u16(TruncateToI32(AsFloat(v) * 16.0f)));
+  d.SetH(0x28EA, u16(TruncateToI32(AsFloat(v) * 16.0f)));  // culdcept-nx: 0x296a->0x28ea
   d.Dirty(kPendingFetch, Bit(53));
 }
 void RsPointSpriteEnable(Device d, u32 v) {  // 0x82635CB0
@@ -276,7 +276,7 @@ void RsPointSpriteEnable(Device d, u32 v) {  // 0x82635CB0
 }
 void RsPointSizeMax(Device d, u32 v) {  // 0x822371C0
   d.SetW(kPointSizeMax, v);
-  d.SetH(0x2968, u16(TruncateToI32(AsFloat(v) * 16.0f)));
+  d.SetH(0x28E8, u16(TruncateToI32(AsFloat(v) * 16.0f)));  // culdcept-nx: 0x2968->0x28e8
   d.Dirty(kPendingFetch, Bit(53));
 }
 void RsMultiSampleAntiAlias(Device d, u32 v) {  // 0x82635B98
@@ -284,7 +284,7 @@ void RsMultiSampleAntiAlias(Device d, u32 v) {  // 0x82635B98
   d.Dirty(kPendingStates, 0x40);
 }
 void RsMultiSampleMask(Device d, u32 v) {  // 0x82635BC8
-  d.SetW(0x2A00, v & 0xFFFF);
+  d.SetW(0x2980, v & 0xFFFF);  // culdcept-nx: 0x2a00->0x2980
   d.Dirty(kPendingMisc, 0x80000);
 }
 void RsScissorTestEnable(Device d, u32 v) {  // 0x82635AA8
@@ -295,11 +295,11 @@ void RsScissorTestEnable(Device d, u32 v) {  // 0x82635AA8
 void RsSlopeScaleDepthBias(Device d, u32 v) {  // 0x82635AC0
   const float scale = AsFloat(v) * 16.0f;
   u32 mode = d.W(off::ModeControl);
-  mode = Insert(mode, (scale != 0.0f || d.F(0x2A54) != 0.0f) ? 1 : 0, 11, 1);
-  const bool back = scale != 0.0f || d.F(0x2A5C) != 0.0f;
-  d.SetF(0x2A50, scale);
+  mode = Insert(mode, (scale != 0.0f || d.F(0x29D4) != 0.0f) ? 1 : 0, 11, 1);  // culdcept-nx: 0x2a54->0x29d4
+  const bool back = scale != 0.0f || d.F(0x29DC) != 0.0f;  // culdcept-nx: 0x2a5c->0x29dc
+  d.SetF(0x29D0, scale);  // culdcept-nx: 0x2a50->0x29d0
   mode = Insert(mode, back ? 1 : 0, 12, 1);
-  d.SetF(0x2A58, scale);
+  d.SetF(0x29D8, scale);  // culdcept-nx: 0x2a58->0x29d8
   d.SetW(off::ModeControl, mode);
   d.Dirty(kPendingMisc, Bit(45) | Bit(43));
   d.Dirty(kPendingStates, 0x40);
@@ -307,11 +307,11 @@ void RsSlopeScaleDepthBias(Device d, u32 v) {  // 0x82635AC0
 void RsDepthBias(Device d, u32 v) {  // 0x821CAFA8
   const float bias = AsFloat(v);
   u32 mode = d.W(off::ModeControl);
-  mode = Insert(mode, (d.F(0x2A50) != 0.0f || bias != 0.0f) ? 1 : 0, 11, 1);
-  const bool back = d.F(0x2A58) != 0.0f || bias != 0.0f;
-  d.SetF(0x2A54, bias);
+  mode = Insert(mode, (d.F(0x29D0) != 0.0f || bias != 0.0f) ? 1 : 0, 11, 1);  // culdcept-nx: 0x2a50->0x29d0
+  const bool back = d.F(0x29D8) != 0.0f || bias != 0.0f;  // culdcept-nx: 0x2a58->0x29d8
+  d.SetF(0x29D4, bias);  // culdcept-nx: 0x2a54->0x29d4
   mode = Insert(mode, back ? 1 : 0, 12, 1);
-  d.SetF(0x2A5C, bias);
+  d.SetF(0x29DC, bias);  // culdcept-nx: 0x2a5c->0x29dc
   d.SetW(off::ModeControl, mode);
   d.Dirty(kPendingMisc, Bit(44) | Bit(42));
   d.Dirty(kPendingStates, 0x40);
@@ -327,15 +327,15 @@ void RsColorWriteEnable(Device d, u32 v) {  // 0x821CAF70, 0x82635BF0, 0x82635C3
 }
 
 void RsTessellationMode(Device d, u32 v) {  // 0x826363C8
-  d.SetW(0x2978, (d.W(0x2978) & ~3u) | (v & 3));
+  d.SetW(0x28F8, (d.W(0x28F8) & ~3u) | (v & 3));  // culdcept-nx: 0x2978->0x28f8, 0x2978->0x28f8
   d.Dirty(kPendingFetch, Bit(49));
 }
 void RsMinTessellationLevel(Device d, u32 v) {  // 0x82636358
-  d.SetW(0x2980, v);
+  d.SetW(0x2900, v);  // culdcept-nx: 0x2980->0x2900
   d.Dirty(kPendingFetch, Bit(47));
 }
 void RsMaxTessellationLevel(Device d, u32 v) {  // 0x82636390
-  d.SetW(0x297C, v);
+  d.SetW(0x28FC, v);  // culdcept-nx: 0x297c->0x28fc
   d.Dirty(kPendingFetch, Bit(48));
 }
 
@@ -343,7 +343,7 @@ void RsMaxTessellationLevel(Device d, u32 v) {  // 0x82636390
 // first of each word ORs the value in unmasked, as N&B's code does.
 template <u32 Index>
 void RsWrap(Device d, u32 v) {  // 0x82635D88 + ...
-  constexpr u32 kWord = Index < 8 ? 0x292C : 0x2930;
+  constexpr u32 kWord = Index < 8 ? 0x28AC : 0x28B0;  // culdcept-nx (vivapinata-nx 4dfb802f): 0x292C->0x28AC, 0x2930->0x28B0, missed by the zone tools
   constexpr u32 kShift = (Index % 8) * 4;
   u32 word = d.W(kWord);
   if constexpr (kShift == 0)
@@ -357,7 +357,7 @@ void RsWrap(Device d, u32 v) {  // 0x82635D88 + ...
 }
 
 void RsViewportEnable(Device d, u32 v) {  // 0x821D53E8
-  d.SetW(0x294C, v ? 0x43Fu : 0x400u);
+  d.SetW(0x28CC, v ? 0x43Fu : 0x400u);  // culdcept-nx: 0x294c->0x28cc
   d.SetW(off::ClipControl, Insert(d.W(off::ClipControl), v ? 0 : 1, 16, 1));
   d.Dirty(kPendingStates, 0x20 | 0x80);
 }
@@ -390,7 +390,7 @@ void RsHighPrecisionBlendEnable(Device d, u32 v) {  // 0x826360F8 + 0x98 * Targe
 }
 
 void RsHalfPixelOffset(Device d, u32 v) {  // 0x82636400
-  d.SetW(0x29C0, (d.W(0x29C0) & ~1u) | (v & 1));
+  d.SetW(0x2940, (d.W(0x2940) & ~1u) | (v & 1));  // culdcept-nx: 0x29c0->0x2940, 0x29c0->0x2940
   d.Dirty(kPendingMisc, Bit(35));
 }
 void RsPrimitiveResetEnable(Device d, u32 v) {  // 0x82636438
@@ -398,7 +398,7 @@ void RsPrimitiveResetEnable(Device d, u32 v) {  // 0x82636438
   d.Dirty(kPendingStates, 0x40);
 }
 void RsPrimitiveResetIndex(Device d, u32 v) {  // 0x82636468
-  d.SetW(0x28D8, v);
+  d.SetW(0x2858, v);  // culdcept-nx: 0x28d8->0x2858
   d.Dirty(kPendingStates, Bit(38));
 }
 void RsAlphaToMaskEnable(Device d, u32 v) {  // 0x82636490
@@ -410,19 +410,19 @@ void RsAlphaToMaskOffsets(Device d, u32 v) {  // 0x826364C0
   d.Dirty(kPendingStates, 0x200);
 }
 void RsGuardBandX(Device d, u32 v) {  // 0x826364E8
-  d.SetW(0x29CC, v);
+  d.SetW(0x294C, v);  // culdcept-nx: 0x29cc->0x294c
   d.Dirty(kPendingMisc, Bit(32));
 }
 void RsGuardBandY(Device d, u32 v) {  // 0x82636518
-  d.SetW(0x29C4, v);
+  d.SetW(0x2944, v);  // culdcept-nx: 0x29c4->0x2944
   d.Dirty(kPendingMisc, Bit(34));
 }
 void RsDiscardBandX(Device d, u32 v) {  // 0x82636548
-  d.SetW(0x29D0, v);
+  d.SetW(0x2950, v);  // culdcept-nx: 0x29d0->0x2950
   d.Dirty(kPendingMisc, 0x80000000u);
 }
 void RsDiscardBandY(Device d, u32 v) {  // 0x82636570
-  d.SetW(0x29C8, v);
+  d.SetW(0x2948, v);  // culdcept-nx: 0x29c8->0x2948
   d.Dirty(kPendingMisc, Bit(33));
 }
 void RsHiStencilEnable(Device d, u32 v) {  // 0x826365E0
@@ -438,7 +438,7 @@ void RsHiStencilFunc(Device d, u32 v) {  // 0x82636640
   d.Dirty(kPendingStates, 0x100);
 }
 void RsHiStencilRef(Device d, u32 v) {  // 0x82636670
-  d.SetB(0x2942, u8(v));
+  d.SetB(0x28C2, u8(v));  // culdcept-nx: 0x2942->0x28c2
   d.Dirty(kPendingStates, 0x100);
 }
 void RsPresentInterval(Device d, u32 v) {  // 0x82636690
@@ -454,20 +454,14 @@ void RsHiZEnable(Device d, u32 v) {  // 0x826365A0
 void RsHiZWriteEnable(Device d, u32 v) {  // 0x82257938
   const u32 flags = Insert(d.W(kBlendFlags), v, 17, 3);
   d.SetW(kBlendFlags, flags);
-  u64 predicated = d.Q(off::PredicatedPending2);
-  if (!(d.B(off::Flags3) & 0x20) && (flags & 0xE0000) == 0x40000)
-    predicated &= ~u64(0x100);
-  else
-    predicated |= 0x100;
-  d.SetQ(off::PredicatedPending2, predicated);
   d.Dirty(kPendingStates, 0x100);
 }
 void RsLastPixel(Device d, u32 v) {  // 0x82635660
-  d.SetW(0x29B8, Insert(d.W(0x29B8), v, 10, 1));
+  d.SetW(0x2938, Insert(d.W(0x2938), v, 10, 1));  // culdcept-nx: 0x29b8->0x2938, 0x29b8->0x2938
   d.Dirty(kPendingMisc, Bit(37));
 }
 void RsLineWidth(Device d, u32 v) {  // 0x82635698
-  d.SetH(0x296E, u16(TruncateToI64(AsFloat(v) * 8.0f)));
+  d.SetH(0x28EE, u16(TruncateToI64(AsFloat(v) * 8.0f)));  // culdcept-nx: 0x296e->0x28ee
   d.Dirty(kPendingFetch, Bit(52));
 }
 void RsBuffer2Frames(Device d, u32 v) {  // 0x82635710
@@ -477,6 +471,7 @@ void RsBuffer2Frames(Device d, u32 v) {  // 0x82635710
 
 using RenderStateFn = void (*)(Device, u32);
 constexpr u32 kRenderStates = 101;
+constexpr u32 kGuestRenderStates = 97;  // culdcept-nx: this XDK's table
 constexpr RenderStateFn kRenderStateFns[kRenderStates] = {
     RsNone, RsNone, RsNone, RsNone, RsNone, RsNone, RsNone, RsNone, RsNone, RsNone,  // 0-9
     RsZEnable,                                   // 10
@@ -729,8 +724,8 @@ constexpr SamplerStateFn kSamplerStateFns[kSamplerStates] = {
 };
 
 // N&B's state tables: {getter, setter, default} per state.
-constexpr u32 kRenderStateTable = 0x82AD8E48;  // katamari-nx: 0x82D8A948->0x82AD8E48
-constexpr u32 kSamplerStateTable = 0x82AD9308;  // katamari-nx: 0x82D8AE28->0x82AD9308
+constexpr u32 kRenderStateTable = 0x828B7500;  // culdcept-nx: tools/renut_state_tables.py, 97 rows paired by default;  // katamari-nx: 0x82D8A948->0x82AD8E48
+constexpr u32 kSamplerStateTable = 0x828B7990;  // culdcept-nx: tools/renut_state_tables.py, 20 rows;  // katamari-nx: 0x82D8AE28->0x82AD9308
 constexpr u32 kTextureSamplers = 26;
 
 u32 TableWord(u32 table, u32 index, u32 field) {
@@ -773,8 +768,8 @@ u32 GetRenderState(Device d, u32 state) {
     case 15: return d.W(kBlendFlags) >> 31;          // AlphaBlendEnable
     case 16: return bits(kBlendFlags, 30, 1);        // SeparateAlphaBlendEnable
     case 17: {  // BlendFactor (sub_826355E8): ARGB from the RGBA floats
-      const u32 r = byte(d.F(0x28E0)), g = byte(d.F(0x28E4)), b = byte(d.F(0x28E8));
-      const u32 a = byte(d.F(0x28EC));
+      const u32 r = byte(d.F(0x2860)), g = byte(d.F(0x2864)), b = byte(d.F(0x2868));  // culdcept-nx: 0x28e0->0x2860, 0x28e4->0x2864, 0x28e8->0x2868
+      const u32 a = byte(d.F(0x286C));  // culdcept-nx: 0x28ec->0x286c
       return (a << 24) | ((r & 0xFF) << 16) | ((g & 0xFF) << 8) | (b & 0xFF);
     }
     case 18: return bits(kBlendState, 0, 5);         // SrcBlend
@@ -784,7 +779,7 @@ u32 GetRenderState(Device d, u32 state) {
     case 22: return bits(kBlendState, 24, 5);        // DestBlendAlpha
     case 23: return bits(kBlendState, 21, 3);        // BlendOpAlpha
     case 24: return bits(off::ColorControl, 3, 1);   // AlphaTestEnable
-    case 25: return byte(d.F(0x2904));               // AlphaRef (sub_82635588)
+    case 25: return byte(d.F(0x2884));               // AlphaRef (sub_82635588) culdcept-nx: 0x2904->0x2884
     case 26: return bits(off::ColorControl, 0, 3);   // AlphaFunc
     case 27: return d.W(kStencilEnable);
     case 28: return bits(off::DepthControl, 7, 1);   // TwoSidedStencilMode
@@ -792,43 +787,43 @@ u32 GetRenderState(Device d, u32 state) {
     case 30: return bits(off::DepthControl, 17, 3);  // StencilZFail
     case 31: return bits(off::DepthControl, 14, 3);  // StencilPass
     case 32: return bits(off::DepthControl, 8, 3);   // StencilFunc
-    case 33: return d.B(0x2903);                     // StencilRef
-    case 34: return d.B(0x2902);                     // StencilMask
-    case 35: return d.B(0x2901);                     // StencilWriteMask
+    case 33: return d.B(0x2883);                     // StencilRef culdcept-nx: 0x2903->0x2883
+    case 34: return d.B(0x2882);                     // StencilMask culdcept-nx: 0x2902->0x2882
+    case 35: return d.B(0x2881);                     // StencilWriteMask culdcept-nx: 0x2901->0x2881
     case 36: return bits(off::DepthControl, 23, 3);  // CCWStencilFail
     case 37: return bits(off::DepthControl, 29, 3);  // CCWStencilZFail
     case 38: return bits(off::DepthControl, 26, 3);  // CCWStencilPass
     case 39: return bits(off::DepthControl, 20, 3);  // CCWStencilFunc
-    case 40: return d.B(0x28FF);                     // CCWStencilRef
-    case 41: return d.B(0x28FE);                     // CCWStencilMask
-    case 42: return d.B(0x28FD);                     // CCWStencilWriteMask
+    case 40: return d.B(0x287F);                     // CCWStencilRef culdcept-nx: 0x28ff->0x287f
+    case 41: return d.B(0x287E);                     // CCWStencilMask culdcept-nx: 0x28fe->0x287e
+    case 42: return d.B(0x287D);                     // CCWStencilWriteMask culdcept-nx: 0x28fd->0x287d
     case 43: return bits(off::ClipControl, 0, 6);    // ClipPlaneEnable
     case 44: return d.W(kPointSize);
     case 45: return d.W(kPointSizeMin);
     case 46: return d.W(kPointSpriteEnable);
     case 47: return d.W(kPointSizeMax);
     case 48: return bits(off::ModeControl, 15, 1);   // MultiSampleAntiAlias
-    case 49: return d.W(0x2A00);                     // MultiSampleMask
+    case 49: return d.W(0x2980);                     // MultiSampleMask culdcept-nx: 0x2a00->0x2980
     case 50: return d.W(kScissorTestEnable);
-    case 51: return std::bit_cast<u32>(d.F(0x2A50) * 0.0625f);  // SlopeScaleDepthBias (flt_82000B58)
-    case 52: return d.W(0x2A54);                     // DepthBias
+    case 51: return std::bit_cast<u32>(d.F(0x29D0) * 0.0625f);  // SlopeScaleDepthBias (flt_82000B58) culdcept-nx: 0x2a50->0x29d0
+    case 52: return d.W(0x29D4);                     // DepthBias culdcept-nx: 0x2a54->0x29d4
     case 53: case 54: case 55: case 56:              // ColorWriteEnable0-3
       return d.W(kColorWriteEnable + (state - 53) * 4);
-    case 57: return bits(0x2978, 0, 2);              // TessellationMode
-    case 58: return d.W(0x2980);                     // MinTessellationLevel
-    case 59: return d.W(0x297C);                     // MaxTessellationLevel
-    case 76: return bits(0x294C, 0, 1);              // ViewportEnable
+    case 57: return bits(0x28F8, 0, 2);              // TessellationMode culdcept-nx (vivapinata-nx 4dfb802f): 0x2978->0x28F8
+    case 58: return d.W(0x2900);                     // MinTessellationLevel culdcept-nx: 0x2980->0x2900
+    case 59: return d.W(0x28FC);                     // MaxTessellationLevel culdcept-nx: 0x297c->0x28fc
+    case 76: return bits(0x28CC, 0, 1);              // ViewportEnable culdcept-nx: 0x294C->0x28CC
     case 77: case 78: case 79: case 80:              // HighPrecisionBlendEnable0-3
       return d.W(kHighPrecisionBlend + (state - 77) * 4);
-    case 81: return bits(0x29C0, 0, 1);              // HalfPixelOffset
+    case 81: return bits(0x2940, 0, 1);              // HalfPixelOffset culdcept-nx: 0x29C0->0x2940
     case 82: return bits(off::ModeControl, 21, 1);   // PrimitiveResetEnable
-    case 83: return d.W(0x28D8);                     // PrimitiveResetIndex
+    case 83: return d.W(0x2858);                     // PrimitiveResetIndex culdcept-nx: 0x28d8->0x2858
     case 84: return bits(off::ColorControl, 4, 1);   // AlphaToMaskEnable
     case 85: return d.B(off::ColorControl);          // AlphaToMaskOffsets
-    case 86: return d.W(0x29CC);                     // GuardBand_X
-    case 87: return d.W(0x29C4);                     // GuardBand_Y
-    case 88: return d.W(0x29D0);                     // DiscardBand_X
-    case 89: return d.W(0x29C8);                     // DiscardBand_Y
+    case 86: return d.W(0x294C);                     // GuardBand_X culdcept-nx: 0x29cc->0x294c
+    case 87: return d.W(0x2944);                     // GuardBand_Y culdcept-nx: 0x29c4->0x2944
+    case 88: return d.W(0x2950);                     // DiscardBand_X culdcept-nx: 0x29d0->0x2950
+    case 89: return d.W(0x2948);                     // DiscardBand_Y culdcept-nx: 0x29c8->0x2948
     case 90: return bits(off::HiControl, 3, 1);      // HiStencilEnable
     case 91: return bits(off::HiControl, 2, 1);      // HiStencilWriteEnable
     case 92: return bits(off::HiControl, 5, 1);      // HiStencilFunc
@@ -837,13 +832,13 @@ u32 GetRenderState(Device d, u32 state) {
     case 95: return bits(kBlendFlags, 23, 7);        // PresentImmediateThreshold
     case 96: return bits(kBlendFlags, 20, 3);        // HiZEnable
     case 97: return bits(kBlendFlags, 17, 3);        // HiZWriteEnable
-    case 98: return bits(0x29B8, 10, 1);             // LastPixel
-    case 99: return std::bit_cast<u32>(float(d.H(0x296E)) * 0.125f);  // LineWidth (sub_826356D8)
+    case 98: return bits(0x2938, 10, 1);             // LastPixel culdcept-nx: 0x29B8->0x2938
+    case 99: return std::bit_cast<u32>(float(d.H(0x28EE)) * 0.125f);  // LineWidth (sub_826356D8) culdcept-nx: 0x296e->0x28ee
     case 100: return bits(kBehaviorFlags2, 0, 1);    // Buffer2Frames
     default:
       if (state >= 60 && state <= 75) {  // Wrap0-15, a nibble each
         const u32 wrap = state - 60;
-        return bits(0x292C + (wrap / 8) * 4, (wrap % 8) * 4, 4);
+        return bits(0x28AC + (wrap / 8) * 4, (wrap % 8) * 4, 4);  // culdcept-nx: 0x292C->0x28AC
       }
       return 0;
   }
@@ -889,11 +884,13 @@ u32 GetSamplerState(Device d, u32 s, u32 state) {
 void InitializeStateTables(Device device) {
   if (!device)
     return;
-  for (u32 i = 0; i < kRenderStates; ++i) {
+  // culdcept-nx: sub_82182688 walks 97 rows (`cmplwi cr6,r30,388`), the sampler table right after them.
+  for (u32 i = 0; i < kGuestRenderStates; ++i) {
     device.SetW(off::SetRenderStateCall + i * 4, TableWord(kRenderStateTable, i, 1));
     device.SetW(off::GetRenderStateCall + i * 4, TableWord(kRenderStateTable, i, 0));
     kRenderStateFns[i](device, TableWord(kRenderStateTable, i, 2));
   }
+  RsHiZWriteEnable(device, 2);  // N&B's row 97
   for (u32 sampler = 0; sampler < kTextureSamplers; ++sampler) {
     for (u32 i = 0; i < kSamplerStates; ++i) {
       device.SetW(off::SetSamplerStateCall + i * 4, TableWord(kSamplerStateTable, i, 1));
@@ -1036,7 +1033,7 @@ bool TilingBoundSurfaces(Device device) {
 void UpdateTilePredicated(Device device) {
   const u8 flags = device.B(off::Flags);
   const bool predicated = !device.W(off::PredicationSet) && !(flags & 0x08) && !(flags & 0x04) &&
-                          !device.B(0x2F93) && TilingBoundSurfaces(device);  // katamari-nx: 0x2FA3->0x2F93
+                          !device.B(0x2E8B) && TilingBoundSurfaces(device);  // katamari-nx: 0x2FA3->0x2F93 (culdcept-nx: 0x2F93->0x2E8B)
   device.SetB(off::Flags, u8((flags & 0xFE) | (predicated ? 1 : 0)));
 }
 
@@ -1045,10 +1042,11 @@ void UpdateTilePredicated(Device device) {
 void SetScissorRect(Device device, i32 left, i32 top, i32 right, i32 bottom) {
   if (!device)
     return;
-  i32 x1 = TruncateToI32(device.F(kViewport));
-  i32 y1 = TruncateToI32(device.F(kViewport + 4));
-  const i32 width = TruncateToI32(device.F(kViewport + 8));
-  const i32 height = TruncateToI32(device.F(kViewport + 12));
+  // culdcept-nx (vivapinata-nx 24da6e4f): integers in this XDK (SetViewport below).
+  i32 x1 = i32(device.W(kViewport));
+  i32 y1 = i32(device.W(kViewport + 4));
+  const i32 width = i32(device.W(kViewport + 8));
+  const i32 height = i32(device.W(kViewport + 12));
   device.SetW(off::ScissorRect, u32(left));
   device.SetW(off::ScissorRect + 4, u32(top));
   device.SetW(off::ScissorRect + 8, u32(right));
@@ -1115,13 +1113,16 @@ void SetViewport(Device device, float x, float y, float width, float height, flo
   }
   const float fw = float(clamped_width);
   const float fh = float(clamped_height);
-  device.SetF(kViewport, x);
-  device.SetF(kViewport + 4, y);
+  // culdcept-nx (vivapinata-nx 24da6e4f): integers in this XDK: four integers and two floats, as the game's SetViewport stores
+  // them; Katamari's seventh word (+24) is this XDK's ScissorRect: not written.
+  (void)fw;
+  (void)fh;
+  device.SetW(kViewport, u32(ix));
+  device.SetW(kViewport + 4, u32(iy));
   device.SetF(kViewport + 16, min_z);
   device.SetF(kViewport + 20, max_z);
-  device.SetF(kViewport + 12, fh);
-  device.SetW(kViewport + 24, 0);
-  device.SetF(kViewport + 8, fw);
+  device.SetW(kViewport + 12, u32(clamped_height));
+  device.SetW(kViewport + 8, u32(clamped_width));
   SetScissorRect(device, i32(device.W(off::ScissorRect)), i32(device.W(off::ScissorRect + 4)),
                  i32(device.W(off::ScissorRect + 8)), i32(device.W(off::ScissorRect + 12)));
   device.SetF(kVportZScale, max_z - min_z);
@@ -1152,7 +1153,7 @@ void SetSurfaceInfo(Device device, u32 surface) {
     return;
   const u32 info = s[6];
   const u32 msaa = Extract(info, 16, 2);
-  device.SetW(0x29BC, msaa == 0 ? 0u : msaa == 1 ? 0x8001u : 0xC003u);
+  device.SetW(0x293C, msaa == 0 ? 0u : msaa == 1 ? 0x8001u : 0xC003u);  // culdcept-nx: 0x29bc->0x293c
   device.SetW(off::SurfaceInfo, info);
   device.Dirty(kPendingStates, Bit(57));
   device.Dirty(kPendingMisc, Bit(36));
@@ -1209,7 +1210,7 @@ void SetDepthStencilSurface(Device device, u32 surface) {
     device.SetW(off::HiControl, hi_control);
     device.SetB(off::Flags2, u8(Insert(device.B(off::Flags2), hi_control, 5, 1)));
     if ((device.B(off::Flags3) & 0x20) && TilingBoundSurfaces(device))
-      device.SetW(off::SurfaceInfo, Insert(device.W(off::SurfaceInfo), device.W(0x336C), 18, 14));  // katamari-nx: 0x337C->0x336C
+      device.SetW(off::SurfaceInfo, Insert(device.W(off::SurfaceInfo), device.W(0x3260), 18, 14));  // katamari-nx: 0x337C->0x336C (culdcept-nx: 0x336C->0x3260)
     device.Dirty(kPendingStates, Bit(55) | 0x100 | 0x20000);
   } else {
     device.SetW(off::HiControl, device.W(off::HiControl) & ~0xFu);
@@ -1370,12 +1371,12 @@ namespace {
 
 // Per D3DFORMAT (low 6 bits) its format description; 0xF00 marks a float
 // depth format (word_82005200).
-constexpr u32 kFormatTable = 0x820FA9D0;  // katamari-nx: 0x82005200->0x820FA9D0
+constexpr u32 kFormatTable = 0x8214F720;  // culdcept-nx: Katamari's and Viva's 128 bytes, word for word (tools/d3d_data_addrs_culdcept.py);  // katamari-nx: 0x82005200->0x820FA9D0
 // The register packets between RB_COPY_CONTROL and RB_COPY_DEST_INFO.
-constexpr u32 kCopyControl = 0x2A18;
-constexpr u32 kCopyDestInfo = 0x2A24;
-constexpr u32 kCopyDepthClear = 0x2A28;  // RB_DEPTH_CLEAR's HiZ part
-constexpr u32 kDepthClear = 0x2A2C;      // RB_DEPTH_CLEAR
+constexpr u32 kCopyControl = 0x2998;  // culdcept-nx: 0x2a18->0x2998
+constexpr u32 kCopyDestInfo = 0x29A4;  // culdcept-nx: 0x2a24->0x29a4
+constexpr u32 kCopyDepthClear = 0x29A8;  // RB_DEPTH_CLEAR's HiZ part culdcept-nx: 0x2a28->0x29a8
+constexpr u32 kDepthClear = 0x29AC;      // RB_DEPTH_CLEAR culdcept-nx: 0x2a2c->0x29ac
 
 // slw / srw: the shift amount is 6 bits, and 32 or more gives 0.
 u32 Slw(u32 value, u32 amount) {
@@ -1526,10 +1527,10 @@ void Clear(Device device, u32 flags, const Rect *rect) {
       return;
   }
   // Within the viewport, and the scissor while it is enabled.
-  const i32 vx = TruncateToI32(device.F(kViewport));
-  const i32 vy = TruncateToI32(device.F(kViewport + 4));
-  const i32 vw = TruncateToI32(device.F(kViewport + 8));
-  const i32 vh = TruncateToI32(device.F(kViewport + 12));
+  const i32 vx = i32(device.W(kViewport));  // culdcept-nx (vivapinata-nx 24da6e4f): integers in this XDK
+  const i32 vy = i32(device.W(kViewport + 4));
+  const i32 vw = i32(device.W(kViewport + 8));
+  const i32 vh = i32(device.W(kViewport + 12));
   i32 x1 = std::max(r.x1, vx);
   i32 y1 = std::max(r.y1, vy);
   i32 x2 = std::min(r.x2, vw + vx);
@@ -1613,10 +1614,10 @@ void Resolve(Device device, u32 flags, u32 dest_texture, float clear_z, u32 clea
 
 namespace {
 
-constexpr u32 kExportAddress = 0x2898;       // [Index]: the stream's GPU address
-constexpr u32 kExportCount = 0x34A8;         // BeginExports not yet ended (katamari-nx: 0x34C0->0x34A8)
-constexpr u32 kExportNanVertexDone = 0x34AC;  // katamari-nx: 0x34C4->0x34AC
-constexpr u32 kExportFlags = 0x34B0;  // katamari-nx: 0x34C8->0x34B0
+constexpr u32 kExportAddress = 0x2818;       // [Index]: the stream's GPU address culdcept-nx: 0x2898->0x2818
+constexpr u32 kExportCount = 0x3348;         // BeginExports not yet ended (katamari-nx: 0x34C0->0x34A8) (culdcept-nx: 0x34A8->0x3348)
+constexpr u32 kExportNanVertexDone = 0x334C;  // katamari-nx: 0x34C4->0x34AC (culdcept-nx: 0x34AC->0x334C)
+constexpr u32 kExportFlags = 0x3350;  // katamari-nx: 0x34C8->0x34B0 (culdcept-nx: 0x34B0->0x3350)
 // N&B's switches for the two GPU workarounds below (dword_82E1A9E4/9E8). katamari-nx: XDK 2.0.5632 has no memexport
 // (no BeginExport / EndExport, the export hooks are not registered), so no such words: 0 = not set.
 constexpr u32 kSkipExportNanVertex = 0;

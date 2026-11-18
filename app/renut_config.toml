@@ -34,10 +34,10 @@ fp_moves_modeless = true
 #   tools/diet_keep_list.py writes the keep list below. v64-v127 stay in ctx from the start (katamari-nx's rc3: a codec
 #   keeping constants in VMX128 registers across its calls decoded green blocks with them as locals).
 #   tools/read_before_write.py on code generated WITH the options: see config/renut_funcs.toml's share_registers.
-non_volatile_as_local = true
+non_volatile_as_local = false
 non_volatile_as_local_keep = ["v64-v127"]
-elide_lr_stores = true
-non_argument_as_local = true
+elide_lr_stores = false
+non_argument_as_local = false
 # 80 ENTRY and 45 RET functions (tools/diet_keep_list.py, from tools/non_argument_audit.py).
 non_argument_as_local_keep = [
     0x8235A9AC, 0x8235A9D4, 0x8235AC94, 0x8235ACBC, 0x8235B52C, 0x8235B54C, 0x8238BD7C, 0x8238BDF4,

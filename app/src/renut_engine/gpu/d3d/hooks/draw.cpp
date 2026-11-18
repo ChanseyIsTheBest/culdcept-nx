@@ -394,7 +394,7 @@ static void BeginTilingImpl(u32 device, u32 count, u32 rects_va, u32 color_va, u
   }
   d.SetW(native::off::TilingExtent, extent_x);
   d.SetW(native::off::TilingExtent + 4, extent_y);
-  d.SetW(0x337C, flags);  // katamari-nx: 0x338C->0x337C; XDK 2.0.5632 keeps Flags there (N&B's update: 0)
+  d.SetW(0x326C, flags);  // katamari-nx: 0x338C->0x337C; XDK 2.0.5632 keeps Flags there (N&B's update: 0) (culdcept-nx: 0x337C->0x326C)
 
   if (!(flags & 1) && !(d.B(native::off::Flags3) & 0x20)) {
     // The largest tile, from its origin: its clear covers a tile of EDRAM.
@@ -406,12 +406,11 @@ static void BeginTilingImpl(u32 device, u32 count, u32 rects_va, u32 color_va, u
     // The viewport (x, y, width, height, min z, max z) and scissor rect, for
     // after the clear.
     float viewport[6];
-    for (u32 i = 0; i < 6; ++i)
-      viewport[i] = d.F(0x3160 + i * 4);  // katamari-nx: 0x3170->0x3160
+    native::GetViewportValues(d, viewport);  // culdcept-nx (vivapinata-nx 24da6e4f): integers in this XDK
     i32 scissor[4];
     for (u32 i = 0; i < 4; ++i)
       scissor[i] = i32(d.W(native::off::ScissorRect + i * 4));
-    native::SetViewport(d, kFullViewport);
+    native::SetViewport(d, 0.0f, 0.0f, 65535.0f, 65535.0f, 0.0f, 1.0f);  // culdcept-nx: Katamari's kFullViewport
     native::SetScissorRect(d, 0, 0, 0xFFFF, 0xFFFF);  // dword_82001190
     const ClearRect rect{0, 0, i32(width), i32(height)};
     float color[4] = {0, 0, 0, 0};
@@ -423,17 +422,17 @@ static void BeginTilingImpl(u32 device, u32 count, u32 rects_va, u32 color_va, u
     native::SetScissorRect(d, scissor[0], scissor[1], scissor[2], scissor[3]);
   }
   if (const auto *color = color_va ? GuestPtr<const u8>(color_va) : nullptr)
-    std::memcpy(d.bytes + 0x3380, color, 16);  // katamari-nx: 0x3390->0x3380
+    std::memcpy(d.bytes + 0x3270, color, 16);  // katamari-nx: 0x3390->0x3380 (culdcept-nx: 0x3380->0x3270)
   else
-    std::memset(d.bytes + 0x3380, 0, 16);  // katamari-nx: 0x3390->0x3380
-  d.SetF(0x3390, clear_z);  // flt_82000D18 (katamari-nx: 0x33A0->0x3390; XDK 2.0.5632: the ClearZ argument)
-  d.SetW(0x3394, clear_stencil);  // katamari-nx: 0x33A4->0x3394; XDK 2.0.5632: the ClearStencil argument
+    std::memset(d.bytes + 0x3270, 0, 16);  // katamari-nx: 0x3390->0x3380 (culdcept-nx: 0x3380->0x3270)
+  d.SetF(0x3280, clear_z);  // flt_82000D18 (katamari-nx: 0x33A0->0x3390; XDK 2.0.5632: the ClearZ argument) (culdcept-nx: 0x3390->0x3280)
+  d.SetW(0x3284, clear_stencil);  // katamari-nx: 0x33A4->0x3394; XDK 2.0.5632: the ClearStencil argument (culdcept-nx: 0x3394->0x3284)
 
   const u32 target = d.W(native::off::RenderTargets);
-  d.SetW(0x31AC, target ? target : d.W(native::off::DepthStencil));  // katamari-nx: 0x31BC->0x31AC
+  d.SetW(0x30A0, target ? target : d.W(native::off::DepthStencil));  // katamari-nx: 0x31BC->0x31AC (culdcept-nx: 0x31AC->0x30A0)
   for (u32 i = 0; i < 5; ++i)  // the 4 targets, then depth
     d.SetW(native::off::TilingSurfaces + i * 4, d.W(native::off::RenderTargets + i * 4));
-  d.SetW(0x31A8, 2);  // katamari-nx: 0x31B8->0x31A8
+  d.SetW(0x309C, 2);  // katamari-nx: 0x31B8->0x31A8 (culdcept-nx: 0x31A8->0x309C)
   d.SetB(native::off::Flags, d.B(native::off::Flags) | 0x20);
   d.SetW(native::off::PredicationSet, 0);
   native::UpdateTilePredicated(d);
@@ -443,7 +442,7 @@ static void BeginTilingImpl(u32 device, u32 count, u32 rects_va, u32 color_va, u
   d.SetW(native::off::RunPredication, 0);
   // The tiles' commands go into a ring segment of their own from a KickOff.
   native::KickOff(device);
-  native::SetViewport(d, kFullViewport);
+  native::SetViewport(d, 0.0f, 0.0f, 65535.0f, 65535.0f, 0.0f, 1.0f);  // culdcept-nx: Katamari's kFullViewport
   native::ResetAllState(d);
 }
 
@@ -486,7 +485,7 @@ static u32 EndTilingImpl(u32 device, bool katamari, u32 resolve_flags, u32 rects
       const u32 tile = native::off::TileRects + i * 16;
       ClearRect rect{i32(d.W(tile)), i32(d.W(tile + 4)), i32(d.W(tile + 8)), i32(d.W(tile + 12))};
       // A tile at the surface's edge resolves to a multiple of 8.
-      const u32 surface = d.W(0x31AC);  // katamari-nx: 0x31BC->0x31AC
+      const u32 surface = d.W(0x30A0);  // katamari-nx: 0x31BC->0x31AC (culdcept-nx: 0x31AC->0x30A0)
       const auto *s = surface ? GuestPtr<const be_u32>(surface) : nullptr;
       const u32 size = s ? u32(s[9]) : 0;
       if (u32(rect.x2) == (size >> 18) + 1)
@@ -505,8 +504,8 @@ static u32 EndTilingImpl(u32 device, bool katamari, u32 resolve_flags, u32 rects
           if (d.W(native::off::DepthStencil))
             flags |= 0x200;
         }
-        Resolve(device, flags, &rect, dest_texture, dest_x, dest_y, 0, 0, device + 0x3380,  // katamari-nx: 0x3390->0x3380
-                d.F(0x3390), d.W(0x3394), 0);  // katamari-nx: 0x33A0->0x3390, 0x33A4->0x3394
+        Resolve(device, flags, &rect, dest_texture, dest_x, dest_y, 0, 0, device + 0x3270,  // katamari-nx: 0x3390->0x3380 (culdcept-nx: 0x3380->0x3270)
+                d.F(0x3280), d.W(0x3284), 0);  // katamari-nx: 0x33A0->0x3390, 0x33A4->0x3394 (culdcept-nx: 0x3390->0x3280, 0x3394->0x3284)
       } else {
         Resolve(device, resolve_flags, &rect, dest_texture, dest_x, dest_y, 0, 0, color_va,
                 clear_z /*N&B: flt_82000C1C*/, clear_stencil, params);
@@ -524,7 +523,7 @@ static u32 EndTilingImpl(u32 device, bool katamari, u32 resolve_flags, u32 rects
 
   d.SetB(native::off::Flags3, d.B(native::off::Flags3) & 0xCF);
   d.SetB(native::off::Flags, d.B(native::off::Flags) & 0xDF);
-  d.SetW(0x31AC, 0);  // katamari-nx: 0x31BC->0x31AC
+  d.SetW(0x30A0, 0);  // katamari-nx: 0x31BC->0x31AC (culdcept-nx: 0x31AC->0x30A0)
   d.SetW(native::off::PredicationSet, 0);
   native::UpdateTilePredicated(d);
   d.SetW(native::off::RunPredicationState, 0);
@@ -533,14 +532,14 @@ static u32 EndTilingImpl(u32 device, bool katamari, u32 resolve_flags, u32 rects
   d.SetW(native::off::RunPredication, 0);
   // sub_821DF678: the segment's fence, unless the device's command memory ran
   // out (EndCommandBuffer marks a device so until the next Begin).
-  const bool out_of_memory = (d.B(native::off::Flags1) & 0x20) != 0;
+  const bool out_of_memory = (d.B(native::off::Flags1) & 0x40) != 0;  // culdcept-nx: 0x20->0x40 (vivapinata-nx's)
   if (out_of_memory) {
-    d.SetB(native::off::Flags1, d.B(native::off::Flags1) & 0xDF);
+    d.SetB(native::off::Flags1, d.B(native::off::Flags1) & 0xBF);  // culdcept-nx: 0xDF->0xBF (vivapinata-nx's)
     native::RewindRing(d);
   } else {
     native::SetFence(device);
   }
-  native::SetViewport(d, kFullViewport);
+  native::SetViewport(d, 0.0f, 0.0f, 65535.0f, 65535.0f, 0.0f, 1.0f);  // culdcept-nx: Katamari's kFullViewport
 
   if (!IsRecordingCommandBuffer(device)) {
     render_thread::Queue([] {
@@ -578,8 +577,7 @@ void D3DDevice_Present_hook(u32 device) {
     return;
   FlushDeferredVertices(device);
   float viewport[6];
-  for (u32 i = 0; i < 6; ++i)
-    viewport[i] = d.F(0x3160 + i * 4);  // katamari-nx: 0x3170->0x3160
+  native::GetViewportValues(d, viewport);  // culdcept-nx (vivapinata-nx 24da6e4f): integers in this XDK
   i32 scissor[4];
   for (u32 i = 0; i < 4; ++i)
     scissor[i] = i32(d.W(native::off::ScissorRect + i * 4));
@@ -595,7 +593,7 @@ void D3DDevice_Present_hook(u32 device) {
   native::SetViewport(d, viewport[0], viewport[1], viewport[2], viewport[3], viewport[4],
                       viewport[5]);
   native::SetScissorRect(d, scissor[0], scissor[1], scissor[2], scissor[3]);
-  native::Swap(device, front_buffer, device + 0x3530);  // katamari-nx: 0x3548->0x3530
+  native::Swap(device, front_buffer, device + 0x33D0);  // katamari-nx: 0x3548->0x3530 (culdcept-nx: 0x3530->0x33D0)
   // katamari-nx: one game frame ends at Present (N&B's ended at its appMainDraw hook, renut_engine/FPS.cpp): frame
   // time, the Switch profiler's frame marks, the stall watchdog. blur-nx (2026-11-17): g_banjo_game_frames is counted
   // in the Swap hook (device.cpp) that native::Swap above runs: Blur swaps without Present.
@@ -614,30 +612,30 @@ void D3DDevice_SetPixelShader_hook(u32 device, u32 shader) {
 
 } // namespace
 
-BANJO_RENUT_HOOK(sub_824D9D08, D3DDevice_DrawVertices_hook);  // D3DDevice_DrawVertices  // katamari-nx: N&B sub_821FB880, signature 0.90 (next 0.77)
-BANJO_RENUT_HOOK(sub_824DA0F0, D3DDevice_DrawIndexedVertices_hook);  // D3DDevice_DrawIndexedVertices  // katamari-nx: N&B sub_8263F358, signature 0.87 (next 0.78)
-BANJO_RENUT_HOOK(sub_824DA9C0, D3DDevice_DrawIndexedTessellatedVertices_hook);  // D3DDevice_DrawIndexedTessellatedVertices  // katamari-nx: N&B sub_821FF958, signature 0.86 (next 0.65)
-BANJO_RENUT_HOOK(sub_824D9758, D3DDevice_DrawVerticesUP_hook);  // D3DDevice_DrawVerticesUP  // katamari-nx: N&B sub_821FD698, D3DDevice_DrawVerticesUP: BeginVertices-style reserve, reads VerticesRingEnd +13428 (N&B +13444) and the flags +10940; sig 0.69/0.55
-BANJO_RENUT_UNHOOKED_HOOK(sub_8263F2B8, D3DDevice_DrawIndexedVerticesUP_hook);  // D3DDevice_DrawIndexedVerticesUP  // katamari-nx: not hooked (D3DDevice_DrawIndexedVerticesUP: no counterpart found (sig 0.32))
-BANJO_RENUT_HOOK(sub_824D92B8, D3DDevice_BeginVertices_hook);  // D3DDevice_BeginVertices  // katamari-nx: N&B sub_821FBD30, signature 0.87 (next 0.70)
-BANJO_RENUT_HOOK(sub_824F3248, D3DDevice_ClearF_hook);  // D3DDevice_ClearF  // katamari-nx: N&B sub_8224F110, D3DDevice_ClearF: sig 0.71/0.40; reads the targets +12432.. and tiling surfaces +12720.. as N&B +12448 / +12736
-BANJO_RENUT_HOOK(sub_824F3370, D3DDevice_Clear_hook);  // D3DDevice_Clear  // katamari-nx: N&B sub_8224F238, signature 0.84 (next 0.36)
-BANJO_RENUT_HOOK(sub_824F12B8, D3DDevice_Resolve_hook);  // D3DDevice_Resolve  // katamari-nx: N&B sub_821FC7A0, signature 0.78 (next 0.33)
-BANJO_RENUT_UNHOOKED_HOOK_SHARED(sub_82246798, D3DDevice_BeginTiling_hook);  // D3DDevice_BeginTiling: N&B's update form, see below
-BANJO_RENUT_UNHOOKED_HOOK(sub_821E17C0, D3DDevice_EndTiling_hook);  // D3DDevice_EndTiling: N&B's update form, see below
+BANJO_RENUT_HOOK(sub_821B4758, D3DDevice_DrawVertices_hook);  // culdcept-nx: Katamari sub_824D9D08; Viva 8245ED58
+BANJO_RENUT_HOOK(sub_821B4B60, D3DDevice_DrawIndexedVertices_hook);  // culdcept-nx: Katamari sub_824DA0F0; Viva 8245F160 by signature 0.74 (next 0.63 sub_821B4758)
+BANJO_RENUT_UNHOOKED_HOOK(unlinked_824DA9C0, D3DDevice_DrawIndexedTessellatedVertices_hook);  // culdcept-nx: Katamari sub_824DA9C0; not placed in this game: Viva 8245F5D8 not paired
+BANJO_RENUT_HOOK(sub_821B4710, D3DDevice_DrawVerticesUP_hook);  // culdcept-nx: Katamari sub_824D9758; Viva 8245E720
+BANJO_RENUT_UNHOOKED_HOOK(unlinked_8263F2B8, D3DDevice_DrawIndexedVerticesUP_hook);  // culdcept-nx: N&B sub_8263F2B8; not placed in this game: Viva 8245ECB8 not paired
+BANJO_RENUT_HOOK(sub_821B4260, D3DDevice_BeginVertices_hook);  // culdcept-nx: Katamari sub_824D92B8; Viva 8245E268
+BANJO_RENUT_HOOK(sub_82187C30, D3DDevice_ClearF_hook);  // culdcept-nx: Katamari sub_824F3248; Viva 824611A0
+BANJO_RENUT_HOOK(sub_82187B70, D3DDevice_Clear_hook);  // culdcept-nx: Katamari sub_824F3370; Viva 824610E0
+BANJO_RENUT_HOOK(sub_8218BE70, D3DDevice_Resolve_hook);  // culdcept-nx: Katamari sub_824F12B8; Viva 82461B80
+BANJO_RENUT_UNHOOKED_HOOK_SHARED(unlinked_82246798, D3DDevice_BeginTiling_hook);  // culdcept-nx: N&B sub_82246798; not placed in this game: no Viva line
+BANJO_RENUT_UNHOOKED_HOOK(unlinked_821E17C0, D3DDevice_EndTiling_hook);  // culdcept-nx: N&B sub_821E17C0; not placed in this game: no Viva line
 // katamari-nx (2026-10-30): XDK 2.0.5632's BeginTiling (sub_824EFBC8: it stores the count at TileCount +0x31C4 and
 // the targets at TilingSurfaces +0x31B0, where the zones put N&B's fields; the game calls it at 0x8271E62C) and
 // EndTiling (sub_824F0150: sig 0.66/0.36, resolves through Resolve sub_824F12B8; called at 0x8272F2E0..0x8272F384),
 // with their full arguments read from the registers (the float argument takes r8's place: ClearStencil is r9).
-BANJO_RENUT_HOOK_RAW(sub_824EFBC8) {
+BANJO_RENUT_HOOK_RAW(sub_8218CD20) {  // culdcept-nx: Katamari sub_824EFBC8; BeginTiling by hand (tools/renut_hook_map_culdcept.txt): `stw r5,12472(r31)`, the tile count; Viva's 82462B58 by signature 0.68; the game's one caller 0x82380804
   BeginTilingImpl(ctx.r3.u32, ctx.r5.u32, ctx.r6.u32, ctx.r7.u32, ctx.r4.u32, float(ctx.f1.f64), ctx.r9.u32);
 }
-BANJO_RENUT_HOOK_RAW(sub_824F0150) {
+BANJO_RENUT_HOOK_RAW(sub_8218D230) {  // culdcept-nx: Katamari sub_824F0150; Viva 82462F68 by signature 0.76 (next 0.39 sub_82187C30)
   ctx.r3.u64 = EndTilingImpl(ctx.r3.u32, true, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32, ctx.r7.u32, float(ctx.f1.f64),
                              ctx.r9.u32, ctx.r10.u32);
 }
-BANJO_RENUT_UNHOOKED_HOOK_SHARED(sub_82237FE8, D3DDevice_BeginExport_hook);  // D3DDevice_BeginExport  // katamari-nx: not hooked (D3DDevice_BeginExport: XDK 2.0.5632 has no memexport functions (as feedingfrenzy2-nx found for 6534))
-BANJO_RENUT_UNHOOKED_HOOK_SHARED(sub_82237D80, D3DDevice_EndExport_hook);  // D3DDevice_EndExport  // katamari-nx: not hooked (D3DDevice_EndExport: as above)
-BANJO_RENUT_HOOK(sub_824E9428, D3DDevice_Present_hook);  // D3DDevice_Present  // katamari-nx: N&B sub_826352B8, D3DDevice_Present: SynchronizeToPresentationInterval sub_824E89E8, Resolve sub_824F12B8, KickOff sub_824E0298, then Swap sub_824E8E90; sig 0.43/0.26
-BANJO_RENUT_HOOK(sub_824D4930, D3DDevice_SetVertexShader_hook);  // D3DDevice_SetVertexShader  // katamari-nx: N&B sub_821F90D8, signature 0.87 (next 0.75)
-BANJO_RENUT_HOOK(sub_824D4630, D3DDevice_SetPixelShader_hook);  // D3DDevice_SetPixelShader  // katamari-nx: N&B sub_821F58A8, signature 0.85 (next 0.73)
+BANJO_RENUT_UNHOOKED_HOOK_SHARED(unlinked_82237FE8, D3DDevice_BeginExport_hook);  // culdcept-nx: N&B sub_82237FE8; not placed in this game: Viva 8245D4B8 not paired
+BANJO_RENUT_UNHOOKED_HOOK_SHARED(unlinked_82237D80, D3DDevice_EndExport_hook);  // culdcept-nx: N&B sub_82237D80; not placed in this game: Viva 8245D590 not paired
+BANJO_RENUT_HOOK(sub_8218E0F8, D3DDevice_Present_hook);  // culdcept-nx: Katamari sub_824E9428; Viva 8246B2F8
+BANJO_RENUT_HOOK(sub_8217CD98, D3DDevice_SetVertexShader_hook);  // culdcept-nx: Katamari sub_824D4930; Viva 8245DE58
+BANJO_RENUT_HOOK(sub_8217C9D0, D3DDevice_SetPixelShader_hook);  // culdcept-nx: Katamari sub_824D4630; Viva 8245DAC8

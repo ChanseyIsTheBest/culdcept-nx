@@ -215,105 +215,105 @@ static_assert(sizeof(ControlPacket) == 48);
 
 // Public D3DDevice (0x2B00 bytes in N&B's XDK) followed by the CDevice-private
 // tail of the 0x5E00-byte allocation Direct3D_CreateDevice makes.
-constexpr u32 kDeviceAllocSize = 0x5700;  // katamari-nx: 0x5E00->0x5700
+constexpr u32 kDeviceAllocSize = 0x5000;  // katamari-nx: 0x5E00->0x5700 (culdcept-nx: 0x5700->0x5000)
 constexpr u32 kDeviceAlignment = 0x80;
 
 struct Device {
+  // culdcept-nx: XDK 2.0.3529: see d3d_native.h off::. m_Predicated_PendingMask2 does not exist yet; 97 render states.
   be_u64 m_Pending[5];                // +0x0000  D3DTAGCOLLECTION dirty masks
-  be_u64 m_Predicated_PendingMask2;   // +0x0028
-  be_u32 m_pRing;                     // +0x0030
-  be_u32 m_pRingLimit;                // +0x0034
-  be_u32 m_pRingGuarantee;            // +0x0038
-  be_u32 m_ReferenceCount;            // +0x003C
-  be_u32 m_SetRenderStateCall[101];   // +0x0040
-  be_u32 m_SetSamplerStateCall[20];   // +0x01D4
-  be_u32 m_GetRenderStateCall[101];   // +0x0224
-  be_u32 m_GetSamplerStateCall[20];   // +0x03B8
-  u8 pad_0408[0x480 - 0x408];         // +0x0408
-  Constants m_Constants;              // +0x0480
-  be_f32 m_ClipPlanes[6][4];          // +0x2820
-  DestinationPacket m_DestinationPacket;  // +0x2880
-  WindowPacket m_WindowPacket;        // +0x28C0
-  ValuesPacket m_ValuesPacket;        // +0x28CC
-  ProgramPacket m_ProgramPacket;      // +0x2920
-  ControlPacket m_ControlPacket;      // +0x2934
-  u8 m_TessellatorPacket[84];         // +0x2964
-  u8 m_MiscPacket[152];               // +0x29B8
-  u8 m_PointPacket[32];               // +0x2A50
-  u8 m_MaxAnisotropy[26];             // +0x2A70
-  u8 m_ZFilter[26];                   // +0x2A8A
-  u8 pad_2AA4[0x2B00 - 0x2AA4];       // +0x2AA4
-  u8 private_[kDeviceAllocSize - 0x2B00];  // +0x2B00  CDevice private state
+  be_u32 m_pRing;                     // +0x0028
+  be_u32 m_pRingLimit;                // +0x002C
+  be_u32 m_pRingGuarantee;            // +0x0030
+  be_u32 m_ReferenceCount;            // +0x0034
+  be_u32 m_SetRenderStateCall[97];    // +0x0038
+  be_u32 m_SetSamplerStateCall[20];   // +0x01BC
+  be_u32 m_GetRenderStateCall[97];    // +0x020C
+  be_u32 m_GetSamplerStateCall[20];   // +0x0390
+  u8 pad_03E0[0x400 - 0x3E0];         // +0x03E0
+  Constants m_Constants;              // +0x0400
+  be_f32 m_ClipPlanes[6][4];          // +0x27A0
+  DestinationPacket m_DestinationPacket;  // +0x2800
+  WindowPacket m_WindowPacket;        // +0x2840
+  ValuesPacket m_ValuesPacket;        // +0x284C
+  ProgramPacket m_ProgramPacket;      // +0x28A0
+  ControlPacket m_ControlPacket;      // +0x28B4
+  u8 m_TessellatorPacket[84];         // +0x28E4
+  u8 m_MiscPacket[152];               // +0x2938
+  u8 m_PointPacket[32];               // +0x29D0
+  u8 m_MaxAnisotropy[26];             // +0x29F0
+  u8 m_ZFilter[26];                   // +0x2A0A
+  u8 pad_2A24[0x2A80 - 0x2A24];       // +0x2A24
+  u8 private_[kDeviceAllocSize - 0x2A80];  // +0x2A80  CDevice private state
 };
 static_assert(sizeof(Device) == kDeviceAllocSize);
-static_assert(offsetof(Device, m_pRing) == 0x30);
-static_assert(offsetof(Device, m_ReferenceCount) == 0x3C);
-static_assert(offsetof(Device, m_SetRenderStateCall) == 0x40);
-static_assert(offsetof(Device, m_SetSamplerStateCall) == 0x1D4);
-static_assert(offsetof(Device, m_GetRenderStateCall) == 0x224);
-static_assert(offsetof(Device, m_GetSamplerStateCall) == 0x3B8);
-static_assert(offsetof(Device, m_Constants) == 0x480);
-static_assert(offsetof(Device, m_ClipPlanes) == 0x2820);
-static_assert(offsetof(Device, m_DestinationPacket) == 0x2880);
-static_assert(offsetof(Device, m_WindowPacket) == 0x28C0);
-static_assert(offsetof(Device, m_ValuesPacket) == 0x28CC);
-static_assert(offsetof(Device, m_ProgramPacket) == 0x2920);
-static_assert(offsetof(Device, m_ControlPacket) == 0x2934);
-static_assert(offsetof(Device, m_TessellatorPacket) == 0x2964);
-static_assert(offsetof(Device, m_MiscPacket) == 0x29B8);
-static_assert(offsetof(Device, m_PointPacket) == 0x2A50);
-static_assert(offsetof(Device, m_MaxAnisotropy) == 0x2A70);
-static_assert(offsetof(Device, m_ZFilter) == 0x2A8A);
+static_assert(offsetof(Device, m_pRing) == 0x28);
+static_assert(offsetof(Device, m_ReferenceCount) == 0x34);
+static_assert(offsetof(Device, m_SetRenderStateCall) == 0x38);
+static_assert(offsetof(Device, m_SetSamplerStateCall) == 0x1BC);
+static_assert(offsetof(Device, m_GetRenderStateCall) == 0x20C);
+static_assert(offsetof(Device, m_GetSamplerStateCall) == 0x390);
+static_assert(offsetof(Device, m_Constants) == 0x400);
+static_assert(offsetof(Device, m_ClipPlanes) == 0x27A0);
+static_assert(offsetof(Device, m_DestinationPacket) == 0x2800);
+static_assert(offsetof(Device, m_WindowPacket) == 0x2840);
+static_assert(offsetof(Device, m_ValuesPacket) == 0x284C);
+static_assert(offsetof(Device, m_ProgramPacket) == 0x28A0);
+static_assert(offsetof(Device, m_ControlPacket) == 0x28B4);
+static_assert(offsetof(Device, m_TessellatorPacket) == 0x28E4);
+static_assert(offsetof(Device, m_MiscPacket) == 0x2938);
+static_assert(offsetof(Device, m_PointPacket) == 0x29D0);
+static_assert(offsetof(Device, m_MaxAnisotropy) == 0x29F0);
+static_assert(offsetof(Device, m_ZFilter) == 0x2A0A);
 
 // CDevice-private fields Direct3D_CreateDevice initialises (byte offsets into
 // the allocation, from its decompilation at 0x82634990).
-constexpr u32 kDeviceOffsetCreationThreadId = 10888;  // GetCurrentThreadId()
-constexpr u32 kDeviceOffsetIsTitleProcess = 10892;    // KeGetCurrentProcessType() == 2
-constexpr u32 kDeviceOffsetBehaviorFlags = 22264;     // Direct3D_CreateDevice arg 4 (katamari-nx: 23980->22264)
+constexpr u32 kDeviceOffsetCreationThreadId = 10760;  // GetCurrentThreadId() culdcept-nx: 0x2a88->0x2a08
+constexpr u32 kDeviceOffsetIsTitleProcess = 10764;    // KeGetCurrentProcessType() == 2 culdcept-nx: 0x2a8c->0x2a0c
+constexpr u32 kDeviceOffsetBehaviorFlags = 20416;     // Direct3D_CreateDevice arg 4 (katamari-nx: 23980->22264) (culdcept-nx: 22264->20416)
 
 // Bound objects the Set* calls store in the CDevice-private area (guest VAs).
 // TU3's CDevice grew by 4 bytes from 0x2AC0 and by 8 from 0x2E30; the fields
 // from 0x3390 on are where they were.
-constexpr u32 kDeviceOffsetVertexDeclaration = 0x2E24;  // SetVertexDeclaration (katamari-nx: 0x2E30->0x2E24)
-constexpr u32 kDeviceOffsetIndexBuffer = 0x308C;        // SetIndices (katamari-nx: 0x309C->0x308C)
-constexpr u32 kDeviceOffsetRenderTargets = 0x3090;      // SetRenderTarget, [4] (katamari-nx: 0x30A0->0x3090)
-constexpr u32 kDeviceOffsetDepthStencil = 0x30A0;       // SetDepthStencilSurface (katamari-nx: 0x30B0->0x30A0)
-constexpr u32 kDeviceOffsetStreamSources = 0x30A4;      // SetStreamSource, [16] (katamari-nx: 0x30B4->0x30A4)
-constexpr u32 kDeviceOffsetStreamStrides = 0x30E8;      // SetStreamSource, u8[16], stride / 4 (katamari-nx: 0x30F8->0x30E8)
-constexpr u32 kDeviceOffsetTextures = 0x30F8;           // SetTexture, [kTextureFetchSlots] (katamari-nx: 0x3108->0x30F8)
-constexpr u32 kDeviceOffsetPixelShader = 0x318C;        // SetPixelShader (katamari-nx: 0x319C->0x318C)
-constexpr u32 kDeviceOffsetVertexShader = 0x3190;       // SetVertexShader (katamari-nx: 0x31A0->0x3190)
+constexpr u32 kDeviceOffsetVertexDeclaration = 0x2D10;  // SetVertexDeclaration (katamari-nx: 0x2E30->0x2E24) (culdcept-nx: 0x2E24->0x2D10)
+constexpr u32 kDeviceOffsetIndexBuffer = 0x2F84;        // SetIndices (katamari-nx: 0x309C->0x308C) (culdcept-nx: 0x308C->0x2F84)
+constexpr u32 kDeviceOffsetRenderTargets = 0x2F88;      // SetRenderTarget, [4] (katamari-nx: 0x30A0->0x3090) (culdcept-nx: 0x3090->0x2F88)
+constexpr u32 kDeviceOffsetDepthStencil = 0x2F98;       // SetDepthStencilSurface (katamari-nx: 0x30B0->0x30A0) (culdcept-nx: 0x30A0->0x2F98)
+constexpr u32 kDeviceOffsetStreamSources = 0x2F9C;      // SetStreamSource, [16] (katamari-nx: 0x30B4->0x30A4) (culdcept-nx: 0x30A4->0x2F9C)
+constexpr u32 kDeviceOffsetStreamStrides = 0x2FE0;      // SetStreamSource, u8[16], stride / 4 (katamari-nx: 0x30F8->0x30E8) (culdcept-nx: 0x30E8->0x2FE0)
+constexpr u32 kDeviceOffsetTextures = 0x2FF0;           // SetTexture, [kTextureFetchSlots] (katamari-nx: 0x3108->0x30F8) (culdcept-nx: 0x30F8->0x2FF0)
+constexpr u32 kDeviceOffsetPixelShader = 0x3080;        // SetPixelShader (katamari-nx: 0x319C->0x318C) (culdcept-nx: 0x318C->0x3080)
+constexpr u32 kDeviceOffsetVertexShader = 0x3084;       // SetVertexShader (katamari-nx: 0x31A0->0x3190) (culdcept-nx: 0x3190->0x3084)
 // renut-ultimate (2026-11-14, port 138; blur-nx's #55): CDevice's viewport floats (x, y, width, height), which D3D
 // clamps a clear to (katamari-nx: 0x3170->0x3160; blur-nx's XDK: 0x3218). A port at another XDK sets its own.
-constexpr u32 kDeviceOffsetViewport = 0x3160;
+constexpr u32 kDeviceOffsetViewport = 0x3058;  // culdcept-nx: 0x3160->0x3058
 // In m_TessellatorPacket, which holds registers 0x2280 on: VGT_HOS_CNTL
 // (tessellation mode in bits 0-1: 0 discrete, 1 continuous, 2 adaptive) and
 // the float VGT_HOS_MAX_TESS_LEVEL / VGT_HOS_MIN_TESS_LEVEL.
-constexpr u32 kDeviceOffsetTessellationControl = 0x2978;
-constexpr u32 kDeviceOffsetMaxTessellationLevel = 0x297C;
-constexpr u32 kDeviceOffsetMinTessellationLevel = 0x2980;
+constexpr u32 kDeviceOffsetTessellationControl = 0x28F8;  // culdcept-nx: 0x2978->0x28f8
+constexpr u32 kDeviceOffsetMaxTessellationLevel = 0x28FC;  // culdcept-nx: 0x297c->0x28fc
+constexpr u32 kDeviceOffsetMinTessellationLevel = 0x2900;  // culdcept-nx: 0x2980->0x2900
 // Tile predication mask of the draws that follow, ~0 for none
 // (D3DDevice_SetPredication 0x821C9240 and SetCommandBufferPredication).
 // Bits 2i and 2i+1 run the commands in tile i's pass of predicated tiling (Z
 // and render).
-constexpr u32 kDeviceOffsetPredication = 0x319C;  // katamari-nx: 0x31AC->0x319C
+constexpr u32 kDeviceOffsetPredication = 0x3090;  // katamari-nx: 0x31AC->0x319C (culdcept-nx: 0x319C->0x3090)
 // D3DCommandBuffer being recorded (BeginCommandBuffer sets, End clears).
-constexpr u32 kDeviceOffsetCommandBuffer = 13492;  // katamari-nx: 13516->13492
+constexpr u32 kDeviceOffsetCommandBuffer = 13140;  // katamari-nx: 13516->13492 (culdcept-nx: 13492->13140)
 // The leading part of the device the draw, clear and resolve paths read (up
 // to and including kDeviceOffsetPredication); a copy of it stands in for the
 // device when a recorded command buffer is replayed.
-constexpr u32 kDeviceSnapshotSize = 0x31A0;  // katamari-nx: 0x31B0->0x31A0
+constexpr u32 kDeviceSnapshotSize = 0x3098;  // katamari-nx: 0x31B0->0x31A0 (culdcept-nx: 0x31A0->0x3098)
 static_assert(kDeviceOffsetVertexShader + 4 <= kDeviceSnapshotSize);
 static_assert(kDeviceOffsetPredication + 4 <= kDeviceSnapshotSize);
 // m_pRing the inline end of BeginVertices / BeginIndexedVertices restores.
-constexpr u32 kDeviceOffsetVerticesRingEnd = 0x3474;  // katamari-nx: 0x3484->0x3474
+constexpr u32 kDeviceOffsetVerticesRingEnd = 0x3314;  // katamari-nx: 0x3484->0x3474 (culdcept-nx: 0x3474->0x3314)
 // Swap bookkeeping (D3DDevice_Swap 0x822554F8).
-constexpr u32 kDeviceOffsetSwapCount = 0x4098;  // katamari-nx: 0x40B0->0x4098
-constexpr u32 kDeviceOffsetFenceTag = 0x2A9C;         // current fence tag
-constexpr u32 kDeviceOffsetSwapFenceTag = 0x2AB0;     // fence tag at the last Swap
-constexpr u32 kDeviceOffsetPresentFenceTag = 0x3A44;  // fence tag of the last presented frame (katamari-nx: 0x3A5C->0x3A44)
-constexpr u32 kDeviceOffsetSwapFlags = 0x2ABD;
-constexpr u8 kSwapFlagPending = 0x10;
+constexpr u32 kDeviceOffsetSwapCount = 0x4E0C;  // katamari-nx: 0x40B0->0x4098 (culdcept-nx: 0x4098->0x4E0C)
+constexpr u32 kDeviceOffsetFenceTag = 0x2A1C;         // current fence tag culdcept-nx: 0x2a9c->0x2a1c
+constexpr u32 kDeviceOffsetSwapFenceTag = 0x2A2C;     // fence tag at the last Swap culdcept-nx: 0x2AB0->0x2A2C (vivapinata-nx's audit: the zone put it on its neighbour)
+constexpr u32 kDeviceOffsetPresentFenceTag = 0x34D0;  // fence tag of the last presented frame (katamari-nx: 0x3A5C->0x3A44) (culdcept-nx: 0x3A44->0x34D0)
+constexpr u32 kDeviceOffsetSwapFlags = 0x2A39;  // culdcept-nx: 0x2abd->0x2a39
+constexpr u8 kSwapFlagPending = 0x20;  // culdcept-nx: 0x10->0x20, vivapinata-nx's (XDK 2.0.3529's Swap flags)
 
 constexpr u32 kMaxStreams = 16;
 constexpr u32 kMaxRenderTargets = 4;

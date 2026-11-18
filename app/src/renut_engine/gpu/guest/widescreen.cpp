@@ -249,7 +249,7 @@ using namespace renut::gpu;
 //                   BOOL *hidef): the screen size for the video mode, 1280x720
 // for every HD mode. Widened here.
 REX_EXTERN(__imp__sub_823BB7C0);
-BANJO_RENUT_HOOK_RAW(sub_823BB7C0) {
+BANJO_RENUT_UNHOOKED_HOOK_RAW(unlinked_823BB7C0) {  // culdcept-nx: Katamari sub_823BB7C0; not placed in this game: no Viva line
   const u32 width_va = ctx.r5.u32;
   const u32 height_va = ctx.r6.u32;
   __imp__sub_823BB7C0(ctx, base);
@@ -260,7 +260,7 @@ BANJO_RENUT_HOOK_RAW(sub_823BB7C0) {
 
 // void sub_822E8660(): the screen pools and the textures over them, once.
 REX_EXTERN(__imp__sub_822E8660);
-BANJO_RENUT_HOOK_RAW(sub_822E8660) {
+BANJO_RENUT_UNHOOKED_HOOK_RAW(unlinked_822E8660) {  // culdcept-nx: Katamari sub_822E8660; not placed in this game: no Viva line
   const bool creates = LoadU32(kPoolsCreatedVa) == 0;
   t_sizing_pools = creates && Widened();
   __imp__sub_822E8660(ctx, base);
@@ -272,7 +272,7 @@ BANJO_RENUT_HOOK_RAW(sub_822E8660) {
 // LPVOID sub_82333708(SIZE_T size, int alignment, DWORD protect): the game's
 // XPhysicalAlloc.
 REX_EXTERN(__imp__sub_82333708);
-BANJO_RENUT_HOOK_RAW(sub_82333708) {
+BANJO_RENUT_UNHOOKED_HOOK_RAW(unlinked_82333708) {  // culdcept-nx: Katamari sub_82333708; not placed in this game: no Viva line
   if (t_sizing_pools)
     ctx.r3.u64 = PoolAllocationBytes(ctx.r3.u32);
   __imp__sub_82333708(ctx, base);
@@ -280,21 +280,21 @@ BANJO_RENUT_HOOK_RAW(sub_82333708) {
 
 // float sub_82208C50(): the active camera's projection aspect.
 REX_EXTERN(__imp__sub_82208C50);
-BANJO_RENUT_HOOK_RAW(sub_82208C50) {
+BANJO_RENUT_UNHOOKED_HOOK_RAW(unlinked_82208C50) {  // culdcept-nx: Katamari sub_82208C50; not placed in this game: no Viva line
   __imp__sub_82208C50(ctx, base);
   WidenAspect(ctx, CameraAspectMode());
 }
 
 // float sub_822050D0(): the projection aspect for the console's mode.
 REX_EXTERN(__imp__sub_822050D0);
-BANJO_RENUT_HOOK_RAW(sub_822050D0) {
+BANJO_RENUT_UNHOOKED_HOOK_RAW(unlinked_822050D0) {  // culdcept-nx: Katamari sub_822050D0; not placed in this game: no Viva line
   __imp__sub_822050D0(ctx, base);
   WidenAspect(ctx, LoadU32(kConsoleAspectModeVa));
 }
 
 // HRESULT XuiRenderSetViewTransform(HXUIDC, const D3DXMATRIX *) [0x821D55E8]
 REX_EXTERN(__imp__sub_821D55E8);
-BANJO_RENUT_HOOK_RAW(sub_821D55E8) {
+BANJO_RENUT_UNHOOKED_HOOK_RAW(unlinked_821D55E8) {  // culdcept-nx: Katamari sub_821D55E8; not placed in this game: no Viva line
   CenterXuiView(ctx.r4.u32);
   __imp__sub_821D55E8(ctx, base);
 }
@@ -302,7 +302,7 @@ BANJO_RENUT_HOOK_RAW(sub_821D55E8) {
 // int sub_823B7338(app): starts XUI; its root (app + 8) is sized to the back
 // buffer with XuiElementSetBounds.
 REX_EXTERN(__imp__sub_823B7338);
-BANJO_RENUT_HOOK_RAW(sub_823B7338) {
+BANJO_RENUT_UNHOOKED_HOOK_RAW(unlinked_823B7338) {  // culdcept-nx: Katamari sub_823B7338; not placed in this game: no Viva line
   t_sizing_xui_root = true;
   __imp__sub_823B7338(ctx, base);
   t_sizing_xui_root = false;
@@ -311,7 +311,7 @@ BANJO_RENUT_HOOK_RAW(sub_823B7338) {
 // HRESULT XuiElementSetBounds(HXUIOBJ, float width, float height) [0x82A27180]:
 // XUI's root keeps the game's 1280 wide.
 REX_EXTERN(__imp__sub_82A27180);
-BANJO_RENUT_HOOK_RAW(sub_82A27180) {
+BANJO_RENUT_UNHOOKED_HOOK_RAW(unlinked_82A27180) {  // culdcept-nx: Katamari sub_82A27180; not placed in this game: no Viva line
   if (Widened()) {
     const u32 object = ctx.r3.u32;
     if (t_sizing_xui_root)
@@ -326,14 +326,14 @@ BANJO_RENUT_HOOK_RAW(sub_82A27180) {
 // A marker's screen position (screen pixels, from the screen's left) goes to
 // its element in XUI's centred 1280-wide space.
 REX_EXTERN(__imp__sub_825CA958);
-BANJO_RENUT_HOOK_RAW(sub_825CA958) {
+BANJO_RENUT_UNHOOKED_HOOK_RAW(unlinked_825CA958) {  // culdcept-nx: Katamari sub_825CA958; not placed in this game: no Viva line
   t_placing_marker = true;
   __imp__sub_825CA958(ctx, base);
   t_placing_marker = false;
 }
 
 REX_EXTERN(__imp__sub_825AB958);
-BANJO_RENUT_HOOK_RAW(sub_825AB958) {
+BANJO_RENUT_UNHOOKED_HOOK_RAW(unlinked_825AB958) {  // culdcept-nx: Katamari sub_825AB958; not placed in this game: no Viva line
   t_placing_marker = true;
   __imp__sub_825AB958(ctx, base);
   t_placing_marker = false;
@@ -341,7 +341,7 @@ BANJO_RENUT_HOOK_RAW(sub_825AB958) {
 
 // HRESULT XuiElementSetPosition(HXUIOBJ, const D3DXVECTOR3 *) [0x82235C88]
 REX_EXTERN(__imp__sub_82235C88);
-BANJO_RENUT_HOOK_RAW(sub_82235C88) {
+BANJO_RENUT_UNHOOKED_HOOK_RAW(unlinked_82235C88) {  // culdcept-nx: Katamari sub_82235C88; not placed in this game: no Viva line
   if (t_placing_marker && Widened()) {
     if (auto *position = GuestPtr<be_f32>(ctx.r4.u32))
       position[0] = position[0].get() - XuiOffset();

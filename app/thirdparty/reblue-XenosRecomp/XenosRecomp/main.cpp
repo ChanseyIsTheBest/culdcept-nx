@@ -1,5 +1,6 @@
 #include "shader.h"
 #include "container_0e.h"  // kameo-nx / feedingfrenzy-nx: version 0x0E containers
+#include "container_10.h"  // culdcept-nx: version 0x10 containers (XDK 2.0.3424)
 #include "shader_recompiler.h"
 #include "dxc_compiler.h"
 #ifdef RENUT_RECOMP
@@ -148,6 +149,35 @@ int main(int argc, char** argv)
                     if (shader.second)
                     {
                         std::vector<uint8_t> converted = container_0e::Convert(original);
+                        auto copy = std::make_unique<uint8_t[]>(converted.size());
+                        std::memcpy(copy.get(), converted.data(), converted.size());
+                        shader.first->second.data = copy.get();
+                        files.emplace_back(std::move(copy));
+#ifdef RENUT_RECOMP
+                        std::string stem = file.path().stem().string();
+                        if (containerIndex > 0)
+                            stem += fmt::format(".{}", containerIndex);
+                        shader.first->second.sourceName = std::move(stem);
+#endif
+                        foundAny = true;
+                    }
+#ifdef RENUT_RECOMP
+                    ++containerIndex;
+#endif
+                    i += originalSize;
+                    continue;
+                }
+                // culdcept-nx (2026-11-19): version 0x10 (XDK 2.0.3424's run-time compiler, Culdcept Saga): keyed by its own
+                // hash and translated from its 0x11 form (container_10.h: only the definition table differs).
+                if (container_10::IsContainer10(fileData.get() + i, fileSize - i))
+                {
+                    const uint8_t* original = fileData.get() + i;
+                    const size_t originalSize = size_t(container_10::Rd(original, 4)) + container_10::Rd(original, 8);
+                    XXH64_hash_t hash = XXH3_64bits(original, originalSize);
+                    auto shader = shaders.try_emplace(hash);
+                    if (shader.second)
+                    {
+                        std::vector<uint8_t> converted = container_10::Convert(original);
                         auto copy = std::make_unique<uint8_t[]>(converted.size());
                         std::memcpy(copy.get(), converted.data(), converted.size());
                         shader.first->second.data = copy.get();

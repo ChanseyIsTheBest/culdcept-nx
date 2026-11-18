@@ -68,6 +68,26 @@ into the jump buffer, which the codegen handles), the other 18 take `share_regis
 After that only the setjmp ones remain. `non_argument_audit.py --with-option`: one HANDOVER, setjmp's caller
 `sub_823CC2C0` -> `sub_82457DF8` saving scratch r11 into the jump buffer: value-independent.
 
+### The register diet breaks the game's HLSL compiler: off for now (2026-11-19)
+
+The game compiles its shaders at run time: the shader manager (`sub_82380F70` / `sub_82381030`, the object at
+`0x83F3BAF0`) calls D3DXCompileShaderFromFile (`sub_823A0488`) on `GAME:\data\shader.fx` for `VS00` / `PS00` (vs_3_0 /
+ps_3_0), with the XDK's whole D3DX HLSL compiler linked statically (2,589 functions reachable from it).
+
+- With the register diet on, every boot stopped 1 s after the audio started: "Call to invalid or unregistered function
+  at 0x00000000" from `sub_823814E0`, a call through slot 13 (`SetBool`) of the vertex shader's ID3DXConstantTable,
+  which was null. The diagnostic hook (`culdcept_diag_shader_compile`, `app/src/culdcept_diag.cpp`) shows the compile
+  failing: `= 80004005`, and with an error buffer of its own: "error X4801: Microcode Compiler internal error: invalid
+  parse tree". The game's error path carries on with no shader and no constant table.
+- `banjo_cpu_verify` (every post-codegen form checking itself): no difference before the stop.
+- **Bisection 1: the diet off** (`non_volatile_as_local`, `non_argument_as_local`, `elide_lr_stores` false; everything
+  else the same, post-codegen in full): both compiles return 0 with their shaders and constant tables, and the game goes
+  on to its intro movies (`data/MOVIE/CI_00-02.wmv`) and the title music. So one of the three keys mistranslates
+  something in the compiler; the audits (`non_argument_audit.py`, `read_before_write.py`) did not see it.
+- The diet stays off until the key and the function are found (the next bisection: each key alone, then the compiler's
+  functions kept out of it). It is a CPU cost on the console (katamari-nx: the save / restore helpers were ~20 % of
+  its main thread's ARM samples without it), not a picture one. `out/renut_config_diet.toml` keeps the diet's config.
+
 ### Functions found at run time
 
 - First PC boot: "Call to invalid or unregistered function" at `0x82197470`. A run of vtable methods (the vtable at
@@ -93,4 +113,23 @@ After that only the setjmp ones remain. `non_argument_audit.py --with-option`: o
 - **Hooks** (`tools/renut_hook_map_culdcept.py`): the base's 368 hook lines through Viva's lines for the same Katamari /
   N&B address to Viva's address, then the pairs: 289 placed; the signature matcher (`tools/renut_sigmatch.py`'s score,
   >= 0.70 and 0.05 ahead) placed 6 more Viva hooks the pairing missed (LockSurface 0.98, EndTiling 0.88, DrawIndexedVertices
-  0.85, Lock2DSurface 0.86, SetPixelShaderConstantB 0.79, SetCommandBufferPredication 0.89): 295.
+  0.85, Lock2DSurface 0.86, SetPixelShaderConstantB 0.79, SetCommandBufferPredication 0.89). The 184 render / sampler
+  state hooks come straight from Culdcept's own tables by row (rows 97-100, HiZWriteEnable / LastPixel / LineWidth /
+  Buffer2Frames, are not in this XDK). Hand answers (`tools/renut_hook_map_culdcept.txt`): IsFencePending is inlined
+  here (`sub_82183368` at `0x821833E4`; the pairing's answer was KickOff); GetRenderState's Wrap10-15 rows all point
+  at `0x82400F98`, `li r3,0; blr`, a body the linker folded with game functions: not hooked. Result
+  (`tools/renut_hook_remap_culdcept.py`): **291 hooks placed, 77 unhooked** (functions this XDK lacks or inlines:
+  GetDeviceCaps, BlockOnFence, the command-buffer recorder, memexport, tessellation, the volume / array textures,
+  D3DVertexShader_Bind, XGRegisterPixelShader ...), two lines sharing one function (the first keeps it).
+- **Device offsets**: `tools/renut_device_offsets_culdcept.py` (vivapinata-nx's zones, as the layout is the same):
+  150 annotated lines; `tools/renut_port_culdcept.py` (vivapinata-nx's edits with this game's data addresses): the
+  device front (no `m_Predicated_PendingMask2`, the ring at +0x28, 97 render states, the constants at 0x400), the
+  struct and its asserts, the field map, the chain, the 24-byte last chunk, no 41 -1 words, the automatic front buffer
+  (its own InitializePresentationParameters `sub_821828F0`), and 97 unannotated literals by the zones.
+- **vivapinata-nx's later fixes for this XDK** (`tools/renut_xdk3424_fixes.py`): the device's viewport holds integers
+  (x, y, width, height; the z range floats), Katamari's seventh word is this XDK's ScissorRect; GetRenderState's
+  `bits(...)` fields and the wrap setter's words -128.
+- **Found here, not in Viva's tree**: the bool constants. The base writes them at Katamari's 0x2780 / 0x2790; this
+  layout's are 0x2700 / 0x2710 (Culdcept's SetPixelShaderConstantB `sub_8217C790` indexes word 2500 + start / 32).
+  vivapinata-nx still has 0x2780 / 0x2790 (a latent fault there: for a handoff note). Also command_buffers.cpp's inherit
+  tail (its assert and the diagnostic loop: 0x2700).

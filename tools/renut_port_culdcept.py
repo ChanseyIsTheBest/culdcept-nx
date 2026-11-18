@@ -1,5 +1,5 @@
-#!/usr/bin/env python3
-"""vivapinata-nx (2026-11-02, from pacman-nx's renut_port_pacman.py): the edits that move Renut's Direct3D layer to Viva Piñata (XDK 2.0.3529, D3D9LTCG),
+﻿#!/usr/bin/env python3
+"""vivapinata-nx (2026-11-02, from pacman-nx's renut_port_pacman.py): the edits that move Renut's Direct3D layer to Viva PiÃ±ata (XDK 2.0.3529, D3D9LTCG),
 after tools/renut_hook_remap_culdcept.py (hooks) and tools/renut_device_offsets_culdcept.py (the literals katamari-nx annotated). docs/culdcept-notes.md,
 "Renut's Direct3D at this game's addresses", has the evidence.
 
@@ -355,7 +355,7 @@ def apply_literals(check):
             if notes:
                 eol = '\r' if line.endswith('\r') else ''
                 body = (comment.rstrip('\r') + ' ') if sep else '  // '
-                lines[i] = code2 + (sep if sep else '') + body + 'culdcept-nx: ' + ', '.join(notes) + eol if sep else code2.rstrip('\r') + '  // vivapinata-nx: ' + ', '.join(notes) + eol
+                lines[i] = code2 + (sep if sep else '') + body + 'culdcept-nx: ' + ', '.join(notes) + eol if sep else code2.rstrip('\r') + '  // culdcept-nx: ' + ', '.join(notes) + eol
                 dirty = True
                 moved += 1
         if dirty and not check:

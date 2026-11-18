@@ -713,7 +713,8 @@ u32 Fetch3DMask(const u8 *container) {
 // renut-ultimate: a 0x11 container only (a 0x0E one's header is laid out otherwise: no export mode read there).
 bool ContainerIsExportOnly(const uint8_t *container) {
   const auto *header = reinterpret_cast<const d3d::ShaderContainer *>(container);
-  if ((u32(header->flags) & 0xFFFFFF00u) != 0x102A1100u)
+  // culdcept-nx: version 0x10 too (XDK 2.0.3424: the same shader info as 0x11).
+  if ((u32(header->flags) & 0xFFFFFF00u) != 0x102A1100u && (u32(header->flags) & 0xFFFFFF00u) != 0x102A1000u)
     return false;
   const u32 word_offset = u32(header->shaderOffset) + 8;
   if (word_offset + 4 > u32(header->virtualSize))
@@ -728,7 +729,9 @@ u32 CreateShaderRecord(const be_u32 *function, bool pixel) {
   const auto *header = reinterpret_cast<const d3d::ShaderContainer *>(container);
   // kameo-nx (2026-11-02, from feedingfrenzy-nx): version 0x0E too (XDK 2135 and 2571); the translator reads it through
   // XenosRecomp/container_0e.h, and only the sizes are read here.
-  if ((u32(header->flags) & 0xFFFFFF00u) != 0x102A1100u && (u32(header->flags) & 0xFFFFFF00u) != 0x102A0E00u) {
+  // culdcept-nx (2026-11-19): version 0x10 too (XDK 2.0.3424's run-time compiler; XenosRecomp/container_10.h).
+  if ((u32(header->flags) & 0xFFFFFF00u) != 0x102A1100u && (u32(header->flags) & 0xFFFFFF00u) != 0x102A0E00u &&
+      (u32(header->flags) & 0xFFFFFF00u) != 0x102A1000u) {
     RGPU_ERROR("Create{}Shader: not a shader container (flags {:08X})", pixel ? "Pixel" : "Vertex",
                u32(header->flags));
     return 0;
@@ -768,7 +771,8 @@ void RegisterGuestShader(u32 shader_va, u32 physical_va, bool pixel) {
   const u32 flags = header->flags;
   const u32 virtual_size = header->virtualSize;
   const u32 physical_size = header->physicalSize;
-  if (((flags & 0xFFFFFF00u) != 0x102A1100u && (flags & 0xFFFFFF00u) != 0x102A0E00u) || ((flags & 1) != 0) == pixel ||  // kameo-nx
+  if (((flags & 0xFFFFFF00u) != 0x102A1100u && (flags & 0xFFFFFF00u) != 0x102A0E00u &&
+       (flags & 0xFFFFFF00u) != 0x102A1000u) || ((flags & 1) != 0) == pixel ||  // kameo-nx; culdcept-nx: 0x10
       virtual_size < sizeof(d3d::ShaderContainer) || virtual_size > 0x10000 ||
       physical_size == 0 || physical_size > 0x100000) {
     RGPU_ERROR("XGRegister{}Shader {:08X}: no shader container at {:08X} (flags {:08X})",
@@ -970,9 +974,9 @@ void D3DVertexShader_Bind_hook(u32 shader_va, u32 declaration_va, mapped_u32 str
 
 } // namespace
 
-BANJO_RENUT_HOOK(sub_824D6120, D3DDevice_CreateVertexShader_hook);  // D3DDevice_CreateVertexShader  // katamari-nx: N&B sub_826377C0, signature 0.85 (next 0.55)
-BANJO_RENUT_HOOK(sub_824D6010, D3DDevice_CreatePixelShader_hook);  // D3DDevice_CreatePixelShader  // katamari-nx: N&B sub_826375D8, D3DDevice_CreatePixelShader: CreateVertexShader takes sub_824D6120 (0.85); this one's next best, 0.66
-BANJO_RENUT_HOOK(sub_824D4C50, D3DDevice_CreateVertexDeclaration_hook);  // D3DDevice_CreateVertexDeclaration  // katamari-nx: N&B sub_826379A0, signature 0.77 (next 0.47)
-BANJO_RENUT_UNHOOKED_HOOK(sub_8263FBD0, D3DVertexShader_Bind_hook);  // D3DVertexShader_Bind  // katamari-nx: not hooked (D3DVertexShader_Bind: no clear counterpart (sig 0.35/0.28))
-BANJO_RENUT_HOOK(sub_824D4838, XGRegisterVertexShader_hook);  // XGRegisterVertexShader  // katamari-nx: N&B sub_826376C8, signature 0.91 (next 0.32)
-BANJO_RENUT_UNHOOKED_HOOK(sub_826375A0, XGRegisterPixelShader_hook);  // XGRegisterPixelShader  // katamari-nx: not hooked (XGRegisterPixelShader: no counterpart (sig 0.26))
+BANJO_RENUT_HOOK(sub_8217CCC8, D3DDevice_CreateVertexShader_hook);  // culdcept-nx: Katamari sub_824D6120; Viva 8245DD88
+BANJO_RENUT_HOOK(sub_8217C8D8, D3DDevice_CreatePixelShader_hook);  // culdcept-nx: Katamari sub_824D6010; Viva 8245D9D0
+BANJO_RENUT_HOOK(sub_8217D040, D3DDevice_CreateVertexDeclaration_hook);  // culdcept-nx: Katamari sub_824D4C50; Viva 8245E0D8
+BANJO_RENUT_UNHOOKED_HOOK(unlinked_8263FBD0, D3DVertexShader_Bind_hook);  // culdcept-nx: N&B sub_8263FBD0; not placed in this game: no Viva line
+BANJO_RENUT_HOOK(sub_8217CBD0, XGRegisterVertexShader_hook);  // culdcept-nx: Katamari sub_824D4838; Viva 8245DC90
+BANJO_RENUT_UNHOOKED_HOOK(unlinked_826375A0, XGRegisterPixelShader_hook);  // culdcept-nx: N&B sub_826375A0; not placed in this game: no Viva line

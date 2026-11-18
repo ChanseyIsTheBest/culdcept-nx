@@ -283,7 +283,7 @@ constexpr u32 kChainFirstFetchChunk = kFetchBegin / kChunkBytes;
 static_assert(kFetchBegin % kChunkBytes == 0 && kChainFirstFetchChunk + kFetchChunks == kChainHeadChunks &&
               kTailBegin == kChainTailBegin && kChainHeadChunks + kTailChunks <= 128);
 // banjo-nx (2026-10-26): as shifts (a loop over the chunks before): the fetch constants' up by 18, the tail's from 30.
-static_assert(kFetchChunks == 12 && kChainFirstFetchChunk == 18 && kChainHeadChunks == 30 &&
+static_assert(kFetchChunks == 12 && kChainFirstFetchChunk == 16 && kChainHeadChunks == 28 &&  // culdcept-nx (vivapinata-nx's): the constants at 0x400
               kChainHeadChunks + kPlainChunks - kFetchChunks <= 128);
 void PlainToChain(uint64_t plain, uint64_t out[2]) {
   const uint64_t tail = plain >> kFetchChunks;
@@ -986,7 +986,8 @@ uint64_t ChangedChunks(const u8 *device, u8 *shadow) {
 // compare, stored whether or not they differ: no branch on the compare; storing equal bytes changes nothing).
 // Title update 3 (banjo-nx 2026-10-29): the snapshot is 12,720 bytes (d3d.h), its last chunk 48 bytes (40 on the base).
 // katamari-nx (2026-10-30): XDK 2.0.5632's snapshot is 12,704 bytes (0x31A0): its last chunk is 32 bytes.
-static_assert(kLastChunkBytes == 32, "TakeLastChunk's loads");
+// culdcept-nx: XDK 2.0.3529's snapshot (12440 bytes) ends in a chunk of 24 bytes (pacman-nx's form).
+static_assert(kLastChunkBytes == 24, "TakeLastChunk's loads");
 inline uint64_t TakeChunk(const u8 *device, u8 *shadow) {
 #if defined(__aarch64__)
   const uint8x16_t a0 = vld1q_u8(device), a1 = vld1q_u8(device + 16);
@@ -1006,11 +1007,14 @@ inline uint64_t TakeChunk(const u8 *device, u8 *shadow) {
 }
 inline uint64_t TakeLastChunk(const u8 *device, u8 *shadow) {
 #if defined(__aarch64__)
-  const uint8x16_t a0 = vld1q_u8(device), a1 = vld1q_u8(device + 16);
-  const uint8x16_t d0 = veorq_u8(a0, vld1q_u8(shadow)), d1 = veorq_u8(a1, vld1q_u8(shadow + 16));
+  // culdcept-nx: 24 bytes (16 + 8; Katamari's 32 were 16 + 16).
+  const uint8x16_t a0 = vld1q_u8(device);
+  const uint8x8_t a1 = vld1_u8(device + 16);
+  const uint8x16_t d0 = veorq_u8(a0, vld1q_u8(shadow));
+  const uint8x8_t d1 = veor_u8(a1, vld1_u8(shadow + 16));
   vst1q_u8(shadow, a0);
-  vst1q_u8(shadow + 16, a1);
-  return vmaxvq_u8(vorrq_u8(d0, d1)) != 0;
+  vst1_u8(shadow + 16, a1);
+  return (vmaxvq_u8(d0) | vmaxv_u8(d1)) != 0;
 #else
   const bool differs = std::memcmp(device, shadow, kLastChunkBytes) != 0;
   std::memcpy(shadow, device, kLastChunkBytes);
@@ -1253,8 +1257,8 @@ size_t CopyState(HostCommandBuffer &buffer, const u8 *device, uint64_t plain_dir
 // defaults. A recording's first op keeps every chunk, so replaying it wrote those over the running device: 75 % of the
 // draws of the first mission had no targets and were dropped, without a word. Now: the words that differ from the device
 // at Begin are the recording's, the others come from the running device. Float constants are apart: vs_set, ps_set.
-constexpr u32 kInheritTailBegin = u32(offsetof(d3d::Device, m_Constants)) + 0x2300;  // 0x2780, after both float blocks
-static_assert(kInheritTailBegin == 0x2780);
+constexpr u32 kInheritTailBegin = u32(offsetof(d3d::Device, m_Constants)) + 0x2300;  // after both float blocks
+static_assert(kInheritTailBegin == 0x2700);  // culdcept-nx: 0x2780->0x2700 (m_Constants at 0x400 in XDK 2.0.3424 / 3529)
 
 // blur-nx (2026-11-11, CPU batch 2): the words that differ from the device at Begin, 128 bytes (one set_words word) at a
 // time. The console race profile of the LTO+PGO build had this scan, inlined into NewOp, at about 5 % of a core on the
@@ -3357,7 +3361,7 @@ void Replay(const u8 *running, const BufferSet &buffers, u32 command_buffer_va, 
           ++replay_state_logged;
           std::string words;
           u32 differing = 0;
-          for (u32 at = 0x2780; at + 4 <= d3d::kDeviceSnapshotSize; at += 4) {
+          for (u32 at = kInheritTailBegin; at + 4 <= d3d::kDeviceSnapshotSize; at += 4) {  // culdcept-nx: was 0x2780
             if (std::memcmp(state + at, running + at, 4) == 0)
               continue;
             if (++differing <= 60)
