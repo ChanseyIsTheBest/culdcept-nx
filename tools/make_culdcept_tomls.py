@@ -43,6 +43,9 @@ SHIPPED = {
     'gpu_plugin': '""',
     'banjo_forwarder_program_id': '""',
     'banjo_shader_misses': '"sdmc:/switch/culdcept-nx/shader_misses"',
+    # No composite before the HUD to run SMAA after: the board and the HUD share one shader pair and one target
+    # (docs/culdcept-notes.md, "SMAA"). Off; the picture is the game's own.
+    'banjo_renut_smaa': 'false',
     # Decided from this port's own log (out/pc_runs/cg13_1, 89 windows: the story and the first board battle): no draw
     # replayed from a recorded command buffer, the inert draw skip 0 in every window.
     'ultimate_renut_replay_inherit_same': 'false',
@@ -81,6 +84,13 @@ CONFIGS = {
     'renut_msaa2.toml': ({'msaa_level': '2'}, 'MSAA 2x (changes the picture: the user\'s decision)'),
     'renut_dynamic.toml': ({'banjo_renut_dynamic_resolution': 'true'},
                            'dynamic resolution, 540-720 handheld / 720-1080 docked (not pixel-identical)'),
+    # culdcept-nx (2026-11-19): in 1 of 3 Ryujinx runs that reached the board, the map's 2D panels (dialogue box, HUD,
+    # the village sign) were missing or drawn with another texture (a red tile's) from the map's load on; not seen on
+    # the PC or in the other runs (docs/culdcept-notes.md, "Missing 2D panels"). The two texture shortcuts that could
+    # keep a stale texture bound, off: the console trial if it shows there.
+    'renut_textures_plain.toml': ({'banjo_deko3d_texture_skip': 'false', 'sasrt_renut_texture_memo_fetch_only': 'false'},
+                                  'the deko3d texture-bind skip (A/B 39) and the fetch-only texture memo off: a trial if '
+                                  'the board\'s 2D panels go missing or show another texture'),
 }
 
 

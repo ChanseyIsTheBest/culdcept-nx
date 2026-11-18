@@ -242,15 +242,63 @@ Switch build. To run again after a large codegen change (the register diet, if i
   `tools/switch-cpu-profile.py --elf app/out/switch/renut`):
   - the main thread in KeWaitForSingleObject from `sub_8256CDC0` (called from `sub_82380B38` <- the script
     interpreter), on an Event "never set or released, reset 1 times 7.7 s ago";
-  - `sub_8256CDC0` is the movie player's stop: it releases the D3D device's thread ownership (`sub_82173198`), sets
-    two workers' state to 2, calls ResumeThread (`sub_82355CF8`, NtResumeThread) on the three worker handles at
-    +264 / +268 / +276, then waits for them;
+  - `sub_8256CDC0` is the movie's play call (first read as its stop): it releases the D3D device's thread
+    ownership (`sub_82173198`), sets two workers' state, resumes the three workers at +264 / +268 / +276
+    (`sub_82355CF8`, NtResumeThread), then waits for the movie's end;
   - three of the player's worker threads (`sub_8256BBF8` / `sub_8256C1D8`, `sub_8256C4B8`, `sub_8256DAE0`) were in
-    NtSuspendThread on themselves (`sub_82355D38`; the SDK's XThread::SelfSuspend).
-  So a worker that had not yet suspended itself when the stop's ResumeThread came lost that resume and suspended for
-  ever. On the PC the SDK's Win32 path lets the guest suspend count go below zero (a resume of a running thread makes
-  it 255, the next suspend makes it 0: "treat as not suspended"), so the early resume is kept; the Linux / Switch path
-  dropped it. **Fixed in the SDK** (`sdk/src/system/xthread.cpp`, key `thread_keep_early_resume`, on): a resume of a
-  thread that is not suspended is kept, and that thread's next self-suspend returns at once, as on the PC. Handoff
-  `05_keep_early_resume.patch`. Why the console does not hit it on the Xbox 360 (if it does not) is not known: its
-  kernel drops such a resume too; the window there is small.
+    NtSuspendThread on themselves (`sub_82355D38`; the SDK's XThread::SelfSuspend); its control thread was in
+    `sub_8255F1B8`, `while (this->+368 != 0) Sleep(50)`.
+  **First guess, wrong**: a lost early resume (the Switch path drops a resume of a running thread, as the console's
+  kernel does; the Win32 path keeps it as a count of 255). Keeping it changed nothing: emu5 stopped at the same press.
+  **The suspend / resume log** (SDK key `thread_suspend_log`, a diagnostic, off; emu7 and the PC's `susp1`) showed
+  the two the same up to the skip; then on the PC the control thread suspended itself too and the main thread resumed
+  all four, while on the Switch the control thread stayed in its Sleep loop. **+368 is the XMV renderer's frames in
+  flight** (at most 3): `sub_8255F630` (vtable slot 10 at `0x82135488`) counts a frame up and registers a GPU
+  callback for it (D3DDevice_InsertCallback, `sub_821746E8`, function `0x8255DD00` -> slot 23, `sub_8255F2E0`, an
+  atomic decrement). Renut runs those callbacks only inside its own D3D hooks once the render thread has reached them
+  (and in IsFencePending, which this game inlines). At the skip no thread makes another D3D call: where the render
+  thread had not reached the last frame's callback when the movie's last hook ran (Ryujinx), the count stayed at 1 for
+  ever; the PC's render thread had reached it. **Fixed**: a game thread entering a kernel wait or a sleep runs the
+  callbacks the render thread has reached (`rex::system::SetGuestWaitHook`, called from `ApplyGuestCoreLayoutAtWait`
+  on game threads; Renut sets it at the first callback; key `banjo_renut_callbacks_at_waits`, on), as the console's GPU
+  runs them by interrupt. The early-resume change was taken out again (console semantics). Handoffs
+  `05_callbacks_at_waits.patch` and `06_thread_suspend_log.patch`.
+- **emu8** (200 s, the fix): through the 144 s press at 60 fps, no stall dump.
+
+## SMAA (2026-11-19, the battle's draw log: `banjo_renut_diag_draw_log_s = 590`, PC `out/pc_runs/runA`, Ryujinx `out/emu_runs/rdcemu1`)
+
+A frame of the board battle is 238 draws on both: draws 0-236 with one shader pair (VS `8F1CFE22`, PS `50216CC1`, the
+two compiled from `data\shader.fx`) into the 1280x736 target, the 3D board and the HUD alike (only the depth control
+changes between groups: `00700736` with depth, `00700712` without), then one rect-list copy with the same pair into the
+1280x720 front buffer. There is no composite before the HUD for `banjo_renut_smaa_after_ps` to name: naming
+`50216CC1` would run SMAA after the frame's first draw; the copy is after the HUD. The base's default hash (N&B's
+`981A6A58F2ABFA42`) never matched here ("SMAA ... 0 frames" in every log). **`banjo_renut_smaa = false`** in the
+built-in defaults and the shipped tomls: the picture is the game's own (the request's pixel-identical default).
+
+## Audio (2026-11-19, `audio_channel_census = true`, PC `out/pc_runs/runA`, 65 windows of 10 s: boot to the battle)
+
+The speaker configuration reported is the default `0x00010001` (analog stereo, digital Dolby Digital): the game still
+put sound in **FL and FR only** in every window (C, LFE, RL and RR 0 frames in all 65). It mixes stereo whatever the
+configuration says, so the port's 5.1-to-stereo fold has nothing to fold. `audio_speaker_config = 1`: see below.
+`audio_switch_pump_pairs` is the user's choice (off as the base ships it).
+
+## Missing 2D panels on the board, once in Ryujinx (2026-11-19, open)
+
+- **What**: in emu9 (the full route, 840 s, the build with the callback fix), from the map's load (452 s) on, the map's
+  2D panels were wrong: the "Santana Village" sign drawn as a translucent red rectangle, Faustina's dialogue box and its
+  text missing (the portrait drawn), and in the battle the Cepter and Creature Card panels and "Spell Selection"
+  missing while the hand of cards drew; the user saw it live too ("there's meant to be a textbox and some image is
+  flickering"). The PC (Vulkan) never showed it, nor did rdcemu1 (with RenderDoc) or emu10 (with the texture memo's
+  verify) on the same NRO: **1 of 3 Ryujinx runs that reached the board**.
+- **What it is not**: the draws. The battle's draw log is the same on the PC and in Ryujinx (238 draws, one shader
+  pair, the same states); rdcemu1's RenderDoc capture of the battle has every panel in the game's 1280x736 target and
+  in the front buffer; emu9's verify counters (store cards, fast draw, whole buffers ...) were all 0.
+- **What it looks like**: textures of the map's UI (loaded at the map's start into memory the story's textures used)
+  answered with other contents: a red tile for the sign, transparent for the dialogue box, panels and font. The two
+  shortcuts that would keep a texture bound across such a change are deko3d's texture-bind skip
+  (`banjo_deko3d_texture_skip`, A/B 39: no rebind while pipeline, descriptors and texture words are unchanged) and the
+  fetch-only texture memo (`sasrt_renut_texture_memo_fetch_only`, keyed by the fetch words). Not proven: the bad state
+  did not come back with diagnostics on.
+- **Left for the console**: `configs/renut_textures_plain.toml` turns both off; if the console shows the missing panels
+  with the shipped settings, that toml is the first trial, and a RenderDoc capture of Ryujinx in the bad state
+  (`tools/run_ryujinx_rdc.ps1 -Times "455,485"`) would name the texture.

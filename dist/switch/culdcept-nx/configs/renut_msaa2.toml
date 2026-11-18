@@ -449,7 +449,7 @@ banjo_deko3d_eager_kicks = true
 # game's own picture. On in every config (your call); false here turns it off. configs/banjo_renut_smaa_ab.toml
 # switches it every 4 s (its GPU time in the "[renut A/B]" lines), _high.toml is the high preset, _compare.toml
 # writes same-frame before/after pictures.
-banjo_renut_smaa = true
+banjo_renut_smaa = false
 # NOT exact, your call (2026-10-21): 75 % of each fur part's shells (three of every four; 16 of Banjo's 21, his
 # outermost shell drawn, so the fur keeps its length; the dialogue portrait's too). 100 draws every shell as the
 # game; configs/banjo_renut_fur_shells_all.toml does that.

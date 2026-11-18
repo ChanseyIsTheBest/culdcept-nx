@@ -27,6 +27,11 @@ Keep `sdmc:/switch/culdcept-nx/logs/` afterwards. What to look for in `renut_001
 - `[renut] SMAA`: frames with SMAA (see the notes' "SMAA").
 - `[audio]`: the stream's under-runs, if any.
 
+If the board's 2D panels (the dialogue box under a portrait, the battle's Cepter / Creature Card panels, "Spell
+Selection") are missing or show another texture (red rectangles), as once in Ryujinx: copy
+`configs/renut_textures_plain.toml` over `culdcept.toml` and play the same part again; say whether they come back
+(docs/culdcept-notes.md, "Missing 2D panels").
+
 ## 2. The picture check: `configs/renut_verify.toml`
 
 Copy it over `culdcept.toml`, play the same route for 5 minutes. Every verify line must count 0 differences (the

@@ -1,3 +1,102 @@
 # culdcept-nx: the bulk list of localized copies (tools/localize_native.py --bulk; their hooks go into the shard files
 # app/generated/hot/banjo_hot_bulk_<k>.inc). Written by tools/switch_hot_bulk.py --merge from this game's profiles
 # (docs/culdcept-notes.md, "Hot functions"). Edit by hand freely: a line is "<address> <what>".
+82387670 1061 console samples, 202 instructions, 1 direct callees
+8238A620 194 console samples, 24 instructions, 0 direct callees
+8217C518 162 console samples, 68 instructions, 0 direct callees
+82376F08 118 console samples, 236 instructions, 6 direct callees
+82387AC8 87 console samples, 64 instructions, 0 direct callees
+82378D50 83 console samples, 30 instructions, 2 direct callees
+82389688 48 console samples, 102 instructions, 2 direct callees
+821EDAA0 46 console samples, 25028 instructions, 131 direct callees
+82382488 36 console samples, 322 instructions, 22 direct callees
+8238B4E0 32 console samples, 148 instructions, 12 direct callees
+8220BDA8 24 console samples, 128 instructions, 0 direct callees
+82198278 21 console samples, 56 instructions, 0 direct callees
+8228F618 20 console samples, 62 instructions, 1 direct callees
+8238B438 18 console samples, 42 instructions, 1 direct callees
+82380170 17 console samples, 42 instructions, 4 direct callees
+82385308 15 console samples, 50 instructions, 2 direct callees
+8217C628 15 console samples, 68 instructions, 0 direct callees
+821B0788 15 console samples, 204 instructions, 1 direct callees
+82378210 13 console samples, 60 instructions, 6 direct callees
+82382990 12 console samples, 80 instructions, 3 direct callees
+8228C1D8 12 console samples, 42 instructions, 2 direct callees
+8234DB88 9 console samples, 92 instructions, 0 direct callees
+82383128 9 console samples, 170 instructions, 2 direct callees
+8217BFD0 9 console samples, 338 instructions, 0 direct callees
+8228C3D8 9 console samples, 72 instructions, 0 direct callees
+8228C130 9 console samples, 42 instructions, 2 direct callees
+82389370 8 console samples, 158 instructions, 8 direct callees
+82376B88 8 console samples, 64 instructions, 1 direct callees
+8228BF08 6 console samples, 66 instructions, 4 direct callees
+8237B440 6 console samples, 64 instructions, 0 direct callees
+8237BD30 6 console samples, 68 instructions, 2 direct callees
+82387420 6 console samples, 94 instructions, 1 direct callees
+82386E38 6 console samples, 60 instructions, 2 direct callees
+821A7B00 6 console samples, 78 instructions, 0 direct callees
+82353820 6 console samples, 288 instructions, 0 direct callees
+82384C80 5 console samples, 56 instructions, 0 direct callees
+82208C78 5 console samples, 42 instructions, 0 direct callees
+82387598 5 console samples, 54 instructions, 1 direct callees
+8228ED78 3 console samples, 68 instructions, 0 direct callees
+823769F8 3 console samples, 84 instructions, 1 direct callees
+823844C0 3 console samples, 190 instructions, 19 direct callees
+821A33F8 3 console samples, 252 instructions, 0 direct callees
+8228BB78 3 console samples, 54 instructions, 0 direct callees
+8228BC50 3 console samples, 104 instructions, 0 direct callees
+8228BDF0 3 console samples, 70 instructions, 1 direct callees
+8237B620 3 console samples, 452 instructions, 2 direct callees
+82360540 3 console samples, 100 instructions, 0 direct callees
+8245C960 3 console samples, 374 instructions, 3 direct callees
+823507C0 3 console samples, 56 instructions, 0 direct callees
+82377A38 3 console samples, 76 instructions, 4 direct callees
+82382AD0 3 console samples, 78 instructions, 3 direct callees
+8228C280 3 console samples, 42 instructions, 2 direct callees
+82356420 3 console samples, 134 instructions, 0 direct callees
+8228FB30 2 console samples, 42 instructions, 1 direct callees
+8245B138 2 console samples, 294 instructions, 0 direct callees
+8219CE58 1 console samples, 592 instructions, 6 direct callees
+823820B0 43153 PC samples (runA)
+823885B0 19666 PC samples (runA)
+82379E20 13261 PC samples (runA)
+82374F48 9154 PC samples (runA)
+8237BFD8 8709 PC samples (runA)
+82389950 2872 PC samples (runA)
+823A7DD0 2413 PC samples (runA)
+823A8668 2281 PC samples (runA)
+823A6E38 1889 PC samples (runA)
+8237AEF0 1753 PC samples (runA)
+823A7640 1687 PC samples (runA)
+8238A7D0 1469 PC samples (runA)
+823A9FE0 1069 PC samples (runA)
+8238D470 1048 PC samples (runA)
+823AA0B0 998 PC samples (runA)
+8237BEF0 921 PC samples (runA)
+823A8190 804 PC samples (runA)
+82374DD8 742 PC samples (runA)
+8238C6E0 684 PC samples (runA)
+823A9E40 671 PC samples (runA)
+8228C328 671 PC samples (runA)
+82375028 661 PC samples (runA)
+823AA168 622 PC samples (runA)
+8217C738 601 PC samples (runA)
+82375CC0 570 PC samples (runA)
+8228C0A8 565 PC samples (runA)
+823A6B58 561 PC samples (runA)
+82291548 545 PC samples (runA)
+82381610 503 PC samples (runA)
+82381548 485 PC samples (runA)
+8239C9B8 463 PC samples (runA)
+82382F98 443 PC samples (runA)
+8220BD20 442 PC samples (runA)
+8238D598 438 PC samples (runA)
+823853D0 435 PC samples (runA)
+8238D670 419 PC samples (runA)
+826595C8 399 PC samples (runA)
+8264E038 367 PC samples (runA)
+82662BF0 367 PC samples (runA)
+823814E0 362 PC samples (runA)
+82374E88 341 PC samples (runA)
+82381D28 325 PC samples (runA)
+8237EE28 306 PC samples (runA)

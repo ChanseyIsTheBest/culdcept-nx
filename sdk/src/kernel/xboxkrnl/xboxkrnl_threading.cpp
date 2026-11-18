@@ -20,6 +20,7 @@
 #include <vector>
 
 #include <rex/chrono/clock.h>
+#include <rex/cvar.h>
 #include <rex/dbg.h>
 #include <rex/kernel/xboxkrnl/private.h>
 #include <rex/kernel/xboxkrnl/threading.h>
@@ -39,6 +40,10 @@
 #include <rex/system/xtypes.h>
 #include <rex/thread/atomic.h>
 #include <rex/thread/mutex.h>
+
+REXCVAR_DEFINE_BOOL(thread_suspend_log, false, "Kernel",
+                    "Diagnostic (culdcept-nx, 2026-11-19): log every NtResumeThread and every NtSuspendThread a thread "
+                    "makes on itself ([suspend] lines: the thread, the counts, the guest caller)");
 
 namespace rex::kernel::xboxkrnl {
 using namespace rex::system;
@@ -184,6 +189,13 @@ u32 NtResumeThread_entry(u32 handle, mapped_u32 suspend_count_ptr) {
   if (thread) {
     REXKRNL_TRACE("[NtResumeThread] handle={:08X} thread={}", uint32_t(handle), thread->name());
     result = thread->Resume(&suspend_count);
+    if (REXCVAR_GET(thread_suspend_log)) {
+      auto* ctx = current_ppc_context();
+      REXKRNL_INFO("[suspend] NtResumeThread {:08X} (id {}) by id {}: previous count {}, now {}; caller lr {:08X}",
+                   uint32_t(handle), thread->thread_id(),
+                   XThread::GetCurrentThread() ? XThread::GetCurrentThread()->thread_id() : 0u, suspend_count,
+                   thread->suspend_count(), ctx ? uint32_t(ctx->lr) : 0u);
+    }
   } else {
     REXKRNL_WARN("[NtResumeThread] handle={:08X} NOT FOUND", uint32_t(handle));
   }
@@ -232,13 +244,30 @@ u32 NtSuspendThread_entry(u32 handle, mapped_u32 suspend_count_ptr) {
     bool is_self_suspend = current_thread && current_thread == thread.get();
     if (is_self_suspend) {
       REXKRNL_TRACE("[NtSuspendThread] self-suspend for thread={:08X}", uint32_t(handle));
+      if (REXCVAR_GET(thread_suspend_log)) {
+        auto* ctx = current_ppc_context();
+        REXKRNL_INFO("[suspend] NtSuspendThread {:08X} (id {}) on itself: count {}; caller lr {:08X}", uint32_t(handle),
+                     thread->thread_id(), thread->suspend_count(), ctx ? uint32_t(ctx->lr) : 0u);
+      }
       suspend_count = thread->SelfSuspend();
       result = X_STATUS_SUCCESS;
+      if (REXCVAR_GET(thread_suspend_log))
+        REXKRNL_INFO("[suspend] {:08X} (id {}) runs again (it was {} before its suspend)", uint32_t(handle),
+                     thread->thread_id(), suspend_count);
     } else {
       result = thread->Suspend(&suspend_count);
     }
 #else
+    if (REXCVAR_GET(thread_suspend_log)) {
+      auto* ctx = current_ppc_context();
+      REXKRNL_INFO("[suspend] NtSuspendThread {:08X} (id {}) by id {}: count {}; caller lr {:08X}", uint32_t(handle),
+                   thread->thread_id(), XThread::GetCurrentThread() ? XThread::GetCurrentThread()->thread_id() : 0u,
+                   thread->suspend_count(), ctx ? uint32_t(ctx->lr) : 0u);
+    }
     result = thread->Suspend(&suspend_count);
+    if (REXCVAR_GET(thread_suspend_log))
+      REXKRNL_INFO("[suspend] {:08X} (id {}) runs again or was suspended (count before {})", uint32_t(handle),
+                   thread->thread_id(), suspend_count);
 #endif
   } else {
     REXKRNL_WARN("[NtSuspendThread] handle={:08X} NOT FOUND", uint32_t(handle));

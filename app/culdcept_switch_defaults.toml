@@ -161,7 +161,10 @@ banjo_deko3d_gpr32 = false
 banjo_deko3d_light_branch = false
 banjo_deko3d_skin_once = true
 banjo_deko3d_eager_kicks = true
-banjo_renut_smaa = true
+# culdcept-nx (2026-11-19): off. Culdcept Saga draws its 3D board and its HUD with one shader pair (VS 8F1CFE22, PS
+# 50216CC1, from data\shader.fx) into one target, then copies it to the front buffer: no composite before the HUD for
+# banjo_renut_smaa_after_ps to name (the battle's draw log on the PC and in Ryujinx, out/pc_runs/runA, emu_runs/rdcemu1).
+banjo_renut_smaa = false
 banjo_renut_fur_shells_percent = 75
 banjo_renut_portrait_fur_shells_percent = 50
 banjo_renut_portrait_msaa_samples = 2

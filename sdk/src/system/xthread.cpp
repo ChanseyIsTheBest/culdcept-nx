@@ -49,17 +49,6 @@ REXCVAR_DEFINE_BOOL(ignore_thread_priorities, true, "Kernel",
 REXCVAR_DEFINE_BOOL(ignore_thread_affinities, true, "Kernel",
                     "Ignores game-specified thread affinities");
 
-// culdcept-nx (2026-11-19): a resume that reaches a thread before it suspends itself is kept for that suspend, on the
-// Linux / Mac / Switch path as the Win32 path already does (there the guest suspend count goes below zero and the next
-// suspend brings it back to zero: "Wrapped to 0 - treat as not suspended"). Culdcept Saga's movie player stops its
-// three workers with ResumeThread and then waits for them; a worker between its last look at the stop flag and its own
-// SuspendThread lost that resume on the Switch and slept for ever, and the game with it (Ryujinx: 3 of 4 runs stopped
-// in a movie's start or end; the stall watch: the main thread in the player's stop, sub_8256CDC0, its workers in
-// NtSuspendThread). The PC never stopped. One resume is kept (a second one before the suspend is lost, as before).
-REXCVAR_DEFINE_BOOL(thread_keep_early_resume, true, "Kernel",
-                    "A resume of a thread that is not suspended is kept, and its next self-suspend returns at once (as "
-                    "on the PC); false = the resume is lost, the self-suspend waits for the next one");
-
 // sasrt-nx (2026-11-09; port 58): a guest thread's host stack, 16 MB (Xenia's) unless the key says less: on the Switch
 // it is heap (SASRT's 31 guest threads at once held ~500 MB). The profiler's thread lines give each thread's deepest
 // sampled stack (switch_profile_stacks) to choose from: measure a game before lowering it. threading_posix.cpp pools
@@ -95,6 +84,11 @@ thread_local uint32_t t_layout_applied = 0;
 thread_local uint8_t t_guest_kind = 0;
 }  // namespace
 #endif
+
+// culdcept-nx (2026-11-19): the guest wait hook (SetGuestWaitHook, ApplyGuestCoreLayoutAtWait) and whether this
+// thread is a game thread that runs it.
+static std::atomic<void (*)()> g_guest_wait_hook{nullptr};
+static thread_local bool t_guest_wait_hook_ok = false;
 
 // renut-ultimate (2026-11-16, port 144; tw2de_nx's rex_spin_hint of 2026-10-22): the Xenon's spin-wait hints with the
 // codegen option spin_hint_yield (off by default; rex/ppc/context.h). The base's yield: on the Switch MaybeYield, whose
@@ -548,6 +542,7 @@ X_STATUS XThread::Create() {
     }
     t_guest_kind = guest_thread_ ? (main_thread_ ? 1 : 2) : 0;  // dishonored-nx (port 103): ApplyGuestCoreLayoutAtWait
 #endif
+    t_guest_wait_hook_ok = guest_thread_;  // culdcept-nx: game threads run the wait hook (SetGuestWaitHook)
     runtime::ThreadState::Bind(thread_state_.get());
 
     // Set thread ID override. This is used by logging.
@@ -1083,8 +1078,6 @@ X_STATUS XThread::Resume(uint32_t* out_suspend_count) {
     uint8_t previous = guest_thread->suspend_count;
     if (previous > 0) {
       guest_thread->suspend_count--;
-    } else if (REXCVAR_GET(thread_keep_early_resume)) {
-      resume_pending_ = true;  // culdcept-nx: kept for the thread's next self-suspend (the Win32 path's wrap)
     }
     if (out_suspend_count) {
       *out_suspend_count = previous;
@@ -1131,10 +1124,6 @@ uint32_t XThread::SelfSuspend() {
   auto guest_thread = guest_object<X_KTHREAD>();
   std::unique_lock<std::mutex> lock(suspend_mutex_);
   uint32_t previous = guest_thread->suspend_count;
-  if (resume_pending_) {  // culdcept-nx: a resume came first (thread_keep_early_resume): no suspend
-    resume_pending_ = false;
-    return previous;
-  }
   guest_thread->suspend_count++;
   suspend_cv_.wait(lock, [guest_thread]() { return guest_thread->suspend_count == 0; });
   return previous;
@@ -1144,7 +1133,18 @@ uint32_t XThread::SelfSuspend() {
 // dishonored-nx (sa2-nx's, 2026-10-20; port 103): RexSetGuestThreadCoreLayout's layout applied by the calling guest
 // thread itself, once per new layout (one atomic load and compare otherwise): from XObject::Wait / SignalAndWait /
 // WaitMultiple and XThread::Delay, so no thread's cores are set while it runs elsewhere.
+// culdcept-nx (2026-11-19): a hook the renderer sets (SetGuestWaitHook), run by a game thread as it enters a wait or a
+// sleep, from here: Renut's GPU callbacks (D3DDevice_InsertCallback) the render thread has reached. On the console the
+// GPU runs them as an interrupt whatever the game threads do; Renut ran them only inside its own D3D hooks, so a game
+// whose threads all wait for a callback, with no D3D call left to make, waited for ever (Culdcept Saga's movie skip:
+// the XMV renderer's frames-in-flight count, decremented by each frame's callback, polled with Sleep(50) by its
+// control thread). Game threads only (not the SDK's host threads); the hook returns at once when none is waiting.
+void SetGuestWaitHook(void (*hook)()) { g_guest_wait_hook.store(hook, std::memory_order_release); }
+
 void ApplyGuestCoreLayoutAtWait() {
+  if (t_guest_wait_hook_ok) {
+    if (auto* hook = g_guest_wait_hook.load(std::memory_order_acquire)) hook();
+  }
 #if REX_PLATFORM_SWITCH
   const uint32_t gen = g_guest_layout_gen.load(std::memory_order_acquire);
   if (gen == 0 || gen == t_layout_applied) [[likely]]
