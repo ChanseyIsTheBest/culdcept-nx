@@ -593,6 +593,9 @@ renut_ambient_occlusion = "Half"
 
 banjo_xma_frame_cache = false
 msaa_level = 1
+ultimate_renut_replay_inherit_same = false
+sasrt_gpu_skip_inert_draws = false
+banjo_renut_tags_check = 256
 banjo_renut_ab_targets = "25,28,22,26,42,1"
 banjo_renut_ab_s = 30
 

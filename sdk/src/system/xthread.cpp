@@ -49,6 +49,17 @@ REXCVAR_DEFINE_BOOL(ignore_thread_priorities, true, "Kernel",
 REXCVAR_DEFINE_BOOL(ignore_thread_affinities, true, "Kernel",
                     "Ignores game-specified thread affinities");
 
+// culdcept-nx (2026-11-19): a resume that reaches a thread before it suspends itself is kept for that suspend, on the
+// Linux / Mac / Switch path as the Win32 path already does (there the guest suspend count goes below zero and the next
+// suspend brings it back to zero: "Wrapped to 0 - treat as not suspended"). Culdcept Saga's movie player stops its
+// three workers with ResumeThread and then waits for them; a worker between its last look at the stop flag and its own
+// SuspendThread lost that resume on the Switch and slept for ever, and the game with it (Ryujinx: 3 of 4 runs stopped
+// in a movie's start or end; the stall watch: the main thread in the player's stop, sub_8256CDC0, its workers in
+// NtSuspendThread). The PC never stopped. One resume is kept (a second one before the suspend is lost, as before).
+REXCVAR_DEFINE_BOOL(thread_keep_early_resume, true, "Kernel",
+                    "A resume of a thread that is not suspended is kept, and its next self-suspend returns at once (as "
+                    "on the PC); false = the resume is lost, the self-suspend waits for the next one");
+
 // sasrt-nx (2026-11-09; port 58): a guest thread's host stack, 16 MB (Xenia's) unless the key says less: on the Switch
 // it is heap (SASRT's 31 guest threads at once held ~500 MB). The profiler's thread lines give each thread's deepest
 // sampled stack (switch_profile_stacks) to choose from: measure a game before lowering it. threading_posix.cpp pools
@@ -1072,6 +1083,8 @@ X_STATUS XThread::Resume(uint32_t* out_suspend_count) {
     uint8_t previous = guest_thread->suspend_count;
     if (previous > 0) {
       guest_thread->suspend_count--;
+    } else if (REXCVAR_GET(thread_keep_early_resume)) {
+      resume_pending_ = true;  // culdcept-nx: kept for the thread's next self-suspend (the Win32 path's wrap)
     }
     if (out_suspend_count) {
       *out_suspend_count = previous;
@@ -1118,6 +1131,10 @@ uint32_t XThread::SelfSuspend() {
   auto guest_thread = guest_object<X_KTHREAD>();
   std::unique_lock<std::mutex> lock(suspend_mutex_);
   uint32_t previous = guest_thread->suspend_count;
+  if (resume_pending_) {  // culdcept-nx: a resume came first (thread_keep_early_resume): no suspend
+    resume_pending_ = false;
+    return previous;
+  }
   guest_thread->suspend_count++;
   suspend_cv_.wait(lock, [guest_thread]() { return guest_thread->suspend_count == 0; });
   return previous;

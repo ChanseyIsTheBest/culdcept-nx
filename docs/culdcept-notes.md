@@ -84,6 +84,17 @@ ps_3_0), with the XDK's whole D3DX HLSL compiler linked statically (2,589 functi
   else the same, post-codegen in full): both compiles return 0 with their shaders and constant tables, and the game goes
   on to its intro movies (`data/MOVIE/CI_00-02.wmv`) and the title music. So one of the three keys mistranslates
   something in the compiler; the audits (`non_argument_audit.py`, `read_before_write.py`) did not see it.
+- **Bisection 2** (`non_volatile_as_local` and `non_argument_as_local` on, `elide_lr_stores` off; PC build 23,
+  `out/pc_runs/diet2`): X4801 again. So `elide_lr_stores` is not (alone) the cause. The setjmp sites are not it either:
+  the generator copies a setjmp caller's C++-local registers into `env` and back after a longjmp
+  (`sdk/src/codegen/function_graph.cpp`). Only two C++ exceptions are thrown in the whole game, none in the compiler.
+- **Bisection 3**: `non_volatile_as_local` alone (build 24, `out/pc_runs/diet3`): X4801. So that key mistranslates
+  something the compiler runs.
+- **Round 4**: both register keys on everywhere except the compiler (it runs at boot only): the functions reached by
+  direct calls from `sub_823A0488` (2,589) and every function of its dense blocks `0x823A0000-0x823F0000`,
+  `0x82420000-0x82440000`, `0x82470000-0x82560000` (its virtual methods, which direct calls do not reach): 3,457
+  functions (`out/d3dx_compiler_set.txt`), in 121 `non_volatile_as_local_exclude` ranges and in
+  `non_argument_as_local_keep` (`tools/diet_exclude_ranges.py`). Build 25.
 - The diet stays off until the key and the function are found (the next bisection: each key alone, then the compiler's
   functions kept out of it). It is a CPU cost on the console (katamari-nx: the save / restore helpers were ~20 % of
   its main thread's ARM samples without it), not a picture one. `out/renut_config_diet.toml` keeps the diet's config.
@@ -106,6 +117,67 @@ ps_3_0), with the XDK's whole D3DX HLSL compiler linked statically (2,589 functi
   two leaves, declared with their ends (`app/config/renut_funcs.toml`). `tools/wide_pointer_scan.py --all`: 805 hits, of
   which the data-referenced starts inside bodies are SEH scope tables (`0x82158xxx`), `.pdata` (`0x82164xxx`) and Shift-JIS
   text; the "built at" ones are switch cases. Only the four vtable methods were real.
+
+## Shaders (2026-11-19)
+
+- **The whole game uses seven shaders** (3 vertex, 4 pixel; `out/renut_shader_dump`, from Renut's captures on the PC):
+  two compiled at run time from `data\shader.fx` (VS00 / PS00, vs_3_0 / ps_3_0), five from its data. All are made in the
+  first second of the boot, so the package is complete from any run. Their constants are few: PS00 reads `$flgTexOn`
+  (bool), `Samp`, `litSpe`.
+- **Version 0x10 containers** (flags `0x102A1000` / `0x102A1001`): XDK 2.0.3424's compiler ("Microsoft (R) Xbox 360
+  Shader Compiler 2.0.3424.0") writes a container between Feeding Frenzy's 0x0E and the 0x11 Renut reads. Renut refused
+  them ("not a shader container", 16 then 304 draws not drawn). Measured on VS00 / PS00: the 0x24-byte header, the
+  constant table and the shader info (physical offset, size, field8 ... the interpolators, the vertex elements) are 0x11's;
+  only the definition table differs (two more header words before its size and one after it: the definitions start at
+  +0x20, not +0x14). `app/thirdparty/reblue-XenosRecomp/XenosRecomp/container_10.h` rewrites that table in 0x11's form for
+  the translator (keyed by the original's hash, as container_0e.h), and Renut accepts 0x10 at its four checks
+  (`d3d/hooks/shader.cpp`, `render/fetch_filters.cpp`). A base handoff (any game at this XDK that compiles at run time).
+- The Switch package (`tools/switch_shaders.ps1`): 7 shaders, 16 KB of GLSL (`app/out/renut_switch/deko3d_glsl.bin`).
+
+## The picture on the PC (Renut on Vulkan, 2026-11-19)
+
+- **Only the left half of the title** at first: BeginTiling was not hooked (Viva's 82462B58 scored 0.68 by signature,
+  under the map's 0.70) while EndTiling was. `sub_8218CD20` stores the tile count (`stw r5,12472(r31)`), the game calls it
+  once (0x82380804): hooked by hand (`tools/renut_hook_map_culdcept.txt`). The whole title since.
+- **Every 3D model and the ground speckled with holes** (the story's field scenes): found in a RenderDoc capture of the
+  PC build (`banjo_renderdoc_game_s`, which needed its frame tick moved to the Swap: it was only called from N&B's
+  appMainDraw hook, so the key captured nothing in the base). `rdc_history.py` on the speckled pixels: the pixel shader
+  "discarded" them; the translator reports no shader with a kill instruction, so it is Renut's alpha test. The textures
+  are bound with alpha forced to 1 (swizzle BGRO; the ground's saved texture alpha is 255 everywhere), so the tested alpha
+  is the vertex colour's. A log of the alpha tests the game sets: ALPHAFUNC GREATEREQUAL with ALPHAREF 255 (threshold
+  1.0), also 1/255 and 0. A white vertex colour interpolated perspective-correctly comes out as 0.99999994 at scattered
+  pixels, which fail `>= 1.0`. Fixed in `shader_common.h` (`RENUT_ALPHA_TEST_UNORM8`, on here): the alpha test compares
+  alpha and reference rounded to the 8-bit grid of the game's colour targets (an ALPHAREF is k / 255). The field scene
+  is clean since (`out/pc_runs/at3`). Renut's early alpha off (`banjo_gpu_early_alpha=false`) had changed nothing. A base
+  handoff, off by default there (it changes a picture: the rule of off-by-default.md section 1).
+- **Gameplay reached**: title, main menu, New Game, the Cepter creation (the name from `headless_keyboard_text`, a test
+  key added to the SDK for this), the save, the story's intro, its field scenes and the first board battle (the map, the
+  hand of cards, "Spell Selection"), about 540 s from boot with the scripted route (`out/pc_runs/story2`).
+
+## CG-13's census (2026-11-19, `tools/cg13_census.ps1 -Seconds 900`, the PC build, `out/cg13_1.txt`)
+
+The route from boot through the story into the first board battle (89 windows of 10 s; the battle from 557 s to 889 s,
+its spell phase). About 5,300 flush-mode switches a second in the game code (each an `msr fpcr` on the console that the
+one-mode build leaves out). Windows with a denormal: 33 sites, cumulative:
+
+| Share | Where | What it is | Verdict |
+|---|---|---|---|
+| 67.8 % | `sub_8228BF08` `vmsum4fp128` | VMX | the Xenon's VMX flushes denormals already: the same result |
+| 7.7 % | `sub_823820B0` `vmulfp128` | VMX | as above |
+| 20.1 % | `sub_8245B5D0` `lfs f0,268(r1)` / `stfs f0,156(r1)` (and its `vsubfp`) | a float copied from one stack slot into a 16-byte block at r1+144..159 that `lvx128 v13` then loads for VMX arithmetic | the value only reaches VMX code, which treats a denormal input as zero: the same result |
+| 4.3 % | `banjo::FormsSelfCheck` | the app's own start-up check of the instruction forms | not game code |
+| < 0.1 % (1-2 events) | `sub_825183E8` (`stfs f1-f4` then the four words added as integers), `sub_824AD460` (`lfs` passing them) | four floats hashed by their bits into a key | a denormal component would hash as 0, the same way every time in a run: harmless |
+
+None divides or normalises such a value, guards against zero or feeds a replay. **BLUR_FPCR_ONE_MODE stays ON** in the
+Switch build. To run again after a large codegen change (the register diet, if it comes back).
+
+## Keys from the log (2026-11-19, blur-nx's rule, port 177; the same run, 89 windows)
+
+- `sasrt_gpu_skip_inert_draws`: 0 in every window: **false**.
+- 0 draws replayed from recorded command buffers (about 14,300 immediate draws a second; the game links no recorder):
+  `ultimate_renut_replay_inherit_same` has nothing to inherit (N = 0): **false**; `banjo_renut_tags_check` sees no
+  recording, so no chunk changes without a mark (M = 0): **256**.
+- Set in `app/culdcept_switch_defaults.toml` (built in) and the package tomls (`tools/make_culdcept_tomls.py`).
 
 ## Renut at this game's addresses (2026-11-19)
 
@@ -144,3 +216,41 @@ ps_3_0), with the XDK's whole D3DX HLSL compiler linked statically (2,589 functi
   layout's are 0x2700 / 0x2710 (Culdcept's SetPixelShaderConstantB `sub_8217C790` indexes word 2500 + start / 32).
   vivapinata-nx still has 0x2780 / 0x2790 (a latent fault there: for a handoff note). Also command_buffers.cpp's inherit
   tail (its assert and the diagnostic loop: 0x2700).
+
+## The Switch build in Ryujinx (2026-11-19, `tools/run_ryujinx.ps1`, `out/emu_runs`)
+
+- The NRO (`app/out/switch/renut.nro`, 39.9 MB; SASRT_HOT_IN_PLACE ON, no copies yet) with the verify keys
+  (`out/emu_tomls/emu_verify.toml`: `configs/renut_verify.toml` plus the route's `input_script`, a capture every 15 s,
+  `headless`, `headless_keyboard_text = "Cepter"`).
+- **emu1** (840 s, the stall watch off): the intro movie drawn (capture 15 s: the OmiyaSoft / Jamsworks logos), frames at
+  29 fps until 25 s, then no game frame, no 10 s report and no file read for the rest of the run; the captures say "no
+  game image". Ryujinx's own log shows nothing at that moment (no guest fault, no service error). One "fast draw
+  verify" line: the kept pipeline's KEY was the same as the one made; only the pipeline object differed (a provisional
+  pipeline replaced; not a state difference).
+- **emu2** (150 s, `banjo_stall_watch_seconds = 5`, `banjo_stall_watch_waits = true`: `out/emu_tomls/emu_stall.toml`):
+  the same route went through: the logos, the title, the main menu, the Cepter creation, the save, the story's intro
+  (captures 15-120 s), 60 fps from the title on (the 10 s frame pacing lines), every verify line 0 differences, no
+  warning. The emu1 stop did not come back; the stall watch stays on in every emulator toml, so that a second one is
+  caught with every thread's place (the log's "[stall]" lines).
+- The emulator's save goes to `sdcard/switch/culdcept-nx/renut/B13EBABEBABEBABE/424107DD`: moved out into the run's
+  folder before a route run (an existing save changes the route), as `out/pc_user` on the PC.
+- **emu3** (840 s, the route): stopped 3 s after the first frame (the first movie starting); no stall dump, as the
+  watch's log went to `sdmc:/switch/banjo_profiler.log` and an empty dump was looked for in the port's folder.
+  **emu4** (300 s, with `tools/emu_watch.ps1` beside it: Ryujinx's CPU use every 5 s, an on-demand dump when the game
+  image stops): stopped at 144 s, in the story, at an A press; Ryujinx's CPU fell from ~0.9 to ~0.2 cores (a
+  deadlock, not a spin). The stall dumps (`out/emu_runs/emu4/banjo_profiler.log`, named with
+  `tools/switch-cpu-profile.py --elf app/out/switch/renut`):
+  - the main thread in KeWaitForSingleObject from `sub_8256CDC0` (called from `sub_82380B38` <- the script
+    interpreter), on an Event "never set or released, reset 1 times 7.7 s ago";
+  - `sub_8256CDC0` is the movie player's stop: it releases the D3D device's thread ownership (`sub_82173198`), sets
+    two workers' state to 2, calls ResumeThread (`sub_82355CF8`, NtResumeThread) on the three worker handles at
+    +264 / +268 / +276, then waits for them;
+  - three of the player's worker threads (`sub_8256BBF8` / `sub_8256C1D8`, `sub_8256C4B8`, `sub_8256DAE0`) were in
+    NtSuspendThread on themselves (`sub_82355D38`; the SDK's XThread::SelfSuspend).
+  So a worker that had not yet suspended itself when the stop's ResumeThread came lost that resume and suspended for
+  ever. On the PC the SDK's Win32 path lets the guest suspend count go below zero (a resume of a running thread makes
+  it 255, the next suspend makes it 0: "treat as not suspended"), so the early resume is kept; the Linux / Switch path
+  dropped it. **Fixed in the SDK** (`sdk/src/system/xthread.cpp`, key `thread_keep_early_resume`, on): a resume of a
+  thread that is not suspended is kept, and that thread's next self-suspend returns at once, as on the PC. Handoff
+  `05_keep_early_resume.patch`. Why the console does not hit it on the Xbox 360 (if it does not) is not known: its
+  kernel drops such a resume too; the window there is small.

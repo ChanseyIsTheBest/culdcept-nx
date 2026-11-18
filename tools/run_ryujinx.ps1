@@ -56,6 +56,15 @@ if (-not $p.HasExited) { Stop-Process -Id $p.Id -Force; Write-Output "stopped pi
 else { Write-Output "Ryujinx exited by itself (code $($p.ExitCode))" }
 Start-Sleep -Seconds 2
 if (Test-Path $logs) { Copy-Item -Recurse $logs (Join-Path $out "logs") -Force }
+# culdcept-nx (2026-11-19): the stall watch, the CPU sampler and stderr write to the SD's switch/ folder itself
+# (banjo_profiler.log, rex_profile.log, rex_stderr.log), appending across runs: each run takes its own out of the SD.
+$swRoot = Split-Path -Parent $sd
+foreach ($n in "banjo_profiler.log", "rex_profile.log", "rex_stderr.log") {
+    $f = Join-Path $swRoot $n
+    if (Test-Path $f) { Move-Item $f (Join-Path $out $n) -Force }
+}
+# The request: the emulator SD's toml is put back after each run (the package's shipped one).
+if ($Toml) { Copy-Item (Join-Path $root "dist\switch\culdcept-nx\renut.toml") (Join-Path $sd "culdcept.toml") -Force }
 # This run's captures move out of the SD (the SD's folder no longer grows); older ones there are left alone.
 Get-ChildItem $sd -Filter "*.png" -Recurse -ErrorAction SilentlyContinue | Where-Object { $_.LastWriteTime -ge $started } |
     Move-Item -Destination $out -Force

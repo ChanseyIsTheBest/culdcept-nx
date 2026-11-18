@@ -43,6 +43,11 @@ SHIPPED = {
     'gpu_plugin': '""',
     'banjo_forwarder_program_id': '""',
     'banjo_shader_misses': '"sdmc:/switch/culdcept-nx/shader_misses"',
+    # Decided from this port's own log (out/pc_runs/cg13_1, 89 windows: the story and the first board battle): no draw
+    # replayed from a recorded command buffer, the inert draw skip 0 in every window.
+    'ultimate_renut_replay_inherit_same': 'false',
+    'sasrt_gpu_skip_inert_draws': 'false',
+    'banjo_renut_tags_check': '256',
 }
 DROP = re.compile(r'^\s*(katamari_\w+|banjo_cpu_native_sub_8[0-9A-Fa-f]{7})\s*=.*$', re.M)
 PLAY = {'log_level': '"off"', 'banjo_renut_diag_resolve_trace': 'false', 'banjo_renut_diag_gpu_shaders': 'false',

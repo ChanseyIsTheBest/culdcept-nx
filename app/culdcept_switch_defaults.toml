@@ -210,3 +210,11 @@ banjo_renut_diag_terrain = false
 renut_shadow_resolution = "1x"
 renut_ambient_occlusion = "Half"
 banjo_xma_frame_cache = false
+
+# culdcept-nx (2026-11-19): three keys decided from this port's own PC log (out/pc_runs/cg13_1: 89 windows of 10 s, the
+# story and the first board battle; blur-nx's rule, port 177): no draw is replayed from a recorded command buffer (all
+# ~14,300 draws a second are immediate: the recorder is not linked in XDK 2.0.3424's build of this game), and the inert
+# draw skip found 0 draws in every window.
+ultimate_renut_replay_inherit_same = false
+sasrt_gpu_skip_inert_draws = false
+banjo_renut_tags_check = 256
