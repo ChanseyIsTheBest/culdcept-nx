@@ -316,6 +316,14 @@ FL and FR only in every window. The game's mix does not depend on the configurat
   textures they replaced. **`banjo_renut_fast_draw = false`** in the built-in defaults and the shipped tomls (A/B 25
   taken out of `renut_ab.toml`); confirmation run emu12 below. Which epoch misses the change was not found (for the
   base: a handoff note). `configs/renut_textures_plain.toml` stays as a further console trial.
+- **Cost of the fast draw off** (emu12, Ryujinx, a proxy): the render thread busy about 15-16 ms a frame on the board
+  and the story's scenes under 60 fps (39-52) in Ryujinx; the fast draw is the render thread's main saving, so the
+  fault was looked for rather than kept off. **`FastDrawLocked`** recomputes a draw's textures only when the
+  recording's field bits (`kFieldFetch`, `kFieldTexWords`), an epoch or the frame say so; this game links D3D9LTCG
+  (Direct3D's setters inlined into the game), so a texture change between two draws of a frame need not pass a hook.
+  **`banjo_renut_fast_fetch_check`** (on): each sampled slot's six fetch words and the device's texture pointer are
+  compared with the last fast draw's, and a difference redoes the textures; the 10 s fast-draw line counts the draws
+  it caught ("fetch words changed with no field bit"). It only adds recomputations.
 
 ## Hot functions: the machine copies (2026-11-19)
 
