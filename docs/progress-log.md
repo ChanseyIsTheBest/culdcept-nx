@@ -32,4 +32,10 @@ Times AEST. The session runs from 2026-11-18 23:45 to 2026-11-19 12:00 (the requ
 | 05:44-05:55 | runA on the PC: the route with the draw log, the audio census (FL/FR only, 65 windows) and the CPU profile. The draw logs match (238 draws, one shader pair): SMAA has no composite to anchor on, off. |
 | 05:56-06:07 | emu10 (the texture memo's verify): every panel right. The panel fault: 1 of 3 runs, open (notes, "Missing 2D panels"; `configs/renut_textures_plain.toml` for the console). |
 | 06:08 | Bulk copies: 56 from the emulator profile (emu9), 43 from the PC's (runA). Diet round 5: the 47 compiler-set functions hot in gameplay back in the diet (3,410 excluded). PC build 27. |
+| 06:10-06:50 | PC build 27 (diet round 5, 99 copies): 2,373 s. |
+| 06:45-06:57 | verify2 on the PC: the route to the battle with every copy guarded on every call (170 M calls, 0 differences), every verify 0, both shaders compiled; CG-13 again: the same VMX / self-check / hash sites, one-mode stays on. DKSH cache: 46 variants, 88 KB. Committed f67e880d. |
+| 06:57-07:03 | poison1 (poisoned dead registers: 0 differences; `audio_speaker_config = 1`: FL/FR only, as the default). Switch build 5 (copies in place): 284 s, 41.6 MB. |
+| 07:04-07:18 | emu11 (the copies build): 60 fps, no stall, verify 0, but the board's panels broken again (2 of 4). Installer release made (`make_release.py`), page checked in the browser pane. |
+| 07:19-07:29 | rdcemu2 (RenderDoc at 470 / 560 s): Ryujinx ran slow with RenderDoc and only reached the story. |
+| 07:35 | The panels' cause: the draw log turns Renut's fast draw off, and the two good runs had it on. `banjo_renut_fast_draw = false` built in and shipped. Switch build 6 (51 s); emu12 to confirm. |
 | (earlier) 00:20-01:00 | Renut's remap prepared: Culdcept's device layout measured equal to Viva Pinata's (XDK 2.0.3529); hook map 291 of 368 lines placed (Viva's lines, the pairs, signatures, Culdcept's own state tables); guest data addresses found; vivapinata-nx's edit and zone tools adapted; its two later XDK fixes (integer viewport, GetRenderState bits) scripted. |

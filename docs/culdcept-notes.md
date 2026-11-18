@@ -68,7 +68,7 @@ into the jump buffer, which the codegen handles), the other 18 take `share_regis
 After that only the setjmp ones remain. `non_argument_audit.py --with-option`: one HANDOVER, setjmp's caller
 `sub_823CC2C0` -> `sub_82457DF8` saving scratch r11 into the jump buffer: value-independent.
 
-### The register diet breaks the game's HLSL compiler: off for now (2026-11-19)
+### The register diet breaks the game's HLSL compiler: on everywhere but the compiler (2026-11-19)
 
 The game compiles its shaders at run time: the shader manager (`sub_82380F70` / `sub_82381030`, the object at
 `0x83F3BAF0`) calls D3DXCompileShaderFromFile (`sub_823A0488`) on `GAME:\data\shader.fx` for `VS00` / `PS00` (vs_3_0 /
@@ -95,7 +95,7 @@ ps_3_0), with the XDK's whole D3DX HLSL compiler linked statically (2,589 functi
   `0x82420000-0x82440000`, `0x82470000-0x82560000` (its virtual methods, which direct calls do not reach): 3,457
   functions (`out/d3dx_compiler_set.txt`), in 121 `non_volatile_as_local_exclude` ranges and in
   `non_argument_as_local_keep` (`tools/diet_exclude_ranges.py`). Build 25.
-- The diet stays off until the key and the function are found (the next bisection: each key alone, then the compiler's
+- (Superseded by rounds 4 and 5:) the diet stayed off until the key and the function were found (the next bisection: each key alone, then the compiler's
   functions kept out of it). It is a CPU cost on the console (katamari-nx: the save / restore helpers were ~20 % of
   its main thread's ARM samples without it), not a picture one. `out/renut_config_diet.toml` keeps the diet's config.
 
@@ -282,7 +282,7 @@ put sound in **FL and FR only** in every window (C, LFE, RL and RR 0 frames in a
 configuration says, so the port's 5.1-to-stereo fold has nothing to fold. `audio_speaker_config = 1`: see below.
 `audio_switch_pump_pairs` is the user's choice (off as the base ships it).
 
-## Missing 2D panels on the board, once in Ryujinx (2026-11-19, open)
+## Missing 2D panels on the board in Ryujinx (2026-11-19): the fast draw, off
 
 - **What**: in emu9 (the full route, 840 s, the build with the callback fix), from the map's load (452 s) on, the map's
   2D panels were wrong: the "Santana Village" sign drawn as a translucent red rectangle, Faustina's dialogue box and its
@@ -302,3 +302,59 @@ configuration says, so the port's 5.1-to-stereo fold has nothing to fold. `audio
 - **Left for the console**: `configs/renut_textures_plain.toml` turns both off; if the console shows the missing panels
   with the shipped settings, that toml is the first trial, and a RenderDoc capture of Ryujinx in the bad state
   (`tools/run_ryujinx_rdc.ps1 -Times "455,485"`) would name the texture.
+
+`audio_speaker_config = 1` (analog stereo only; PC `out/pc_runs/poison1`, 300 s: boot, the title, the story): the same,
+FL and FR only in every window. The game's mix does not depend on the configuration: the shipped default
+(`0x00010001`) stays.
+
+- **Found (07:35)**: emu11 (the copies build) showed it again: 2 of 4 runs. The two good runs both had the draw log
+  on, and in `FastDrawLocked` the draw log (`cfg.draw_log`) sends every draw down the full path
+  (`FastMiss(kFastDiag)`): **the good runs ran without the fast draw** (`banjo_renut_fast_draw`, A/B 25, deko3d
+  only: `!IsDeko3D()` returns at once, so never on the PC), the bad runs with it ("100.0 % fast" in their logs).
+  The fast draw starts each draw from the draw before and redoes only what the recording's field bits and the render
+  thread's epochs say changed; the map's UI textures, loaded at the map's start where the story's had been, kept the
+  textures they replaced. **`banjo_renut_fast_draw = false`** in the built-in defaults and the shipped tomls (A/B 25
+  taken out of `renut_ab.toml`); confirmation run emu12 below. Which epoch misses the change was not found (for the
+  base: a handoff note). `configs/renut_textures_plain.toml` stays as a further console trial.
+
+## Hot functions: the machine copies (2026-11-19)
+
+- **Profiles**: Ryujinx (`out/emu_runs/emu9/rex_profile.log`, the ARM sampler over the whole route, with that NRO's ELF
+  kept next to it) and the PC (`banjo_pc_profile_s = 60`, `banjo_pc_profile_top = 400`, `out/pc_runs/runA`, 600 s to the
+  battle). The game is light: on the PC the guest Sleep wrapper `sub_82357230` (25 % of busy samples, waiting) and a
+  short list of engine functions (`sub_82387670` 1.7 %, `sub_823820B0` 1.5 %, `sub_823885B0` 0.7 % ...); in Ryujinx the
+  main thread is 37 % generated code, the render thread's work is Renut's.
+- **List** (`app/src/cpu/hot/localized_bulk.txt`): 56 from the Ryujinx profile (`tools/switch_hot_bulk.py --merge`,
+  min 1 sample; 38 under 40 instructions left out, 19 mentioned by a source left out) and 43 from the PC's
+  (`tools/pc_hot_to_bulk.py`, 300 samples or more, the Sleep wrapper skipped): **99 copies** (12 shards), all made by
+  `localize_native.py` (none refused).
+- **Checked on the PC** (the hooked build, guard forms on): `verify2`, the route to the battle with
+  `banjo_cpu_verify`, `banjo_hot_guard_calls = 4000`, `banjo_hot_guard_period = 1`: 170,431,758 calls compared,
+  **0 differences**; every other verify line 0. `poison1` (`banjo_hot_poison_dead = true`, period 64): 0 differences.
+  The Switch build has them in place (SASRT_HOT_IN_PLACE, 202 `g_in_place_` symbols).
+- **Register diet round 5**: the 47 functions of the compiler's exclusion set that either profile sampled (shared
+  helpers: `sub_82374F48`, `sub_823A7DD0` ...; 31 % of the Ryujinx gameplay samples were in the set) are back in the
+  diet; 3,410 stay out. Both shaders compile the same (`verify2`, `poison1`).
+- **CG-13 again** (`verify2`, the census on the same run, 63 windows): the same sites as before, VMX
+  (`vmsum4fp128` in `sub_8228BF08`, now reached through the copies of `sub_82291548` / `sub_8238A7D0`; `vmulfp128` in
+  `sub_823820B0`; `vmaddcfp128` in `sub_825A61A0`), the start-up self-check, and the float-bits hash
+  (`sub_825183E8` / `sub_824AD460`). **BLUR_FPCR_ONE_MODE stays ON.**
+- Not done: a console profile (the only source for hand-written natives, the request), more batches of unsampled
+  eligible functions (a PC build with the copies took 40 min).
+
+## Enhancements (2026-11-19)
+
+- **Checked with the verify keys** (`configs/renut_verify.toml`: fast draw, resource objects, fetch cache, whole
+  buffers, persistent shared, chain reuse, snapshot deltas, store cards, record extents; plus `banjo_cpu_verify`):
+  Ryujinx emu2, emu9, emu10, emu11 and the PC's verify2 to the battle: **0 differences** in every verify line. One
+  "fast draw verify" line in emu1 (the key the same, only the pipeline object different: a provisional one replaced).
+- **Off-by-default.md section 1** (fixes that break another game): none turned on (no A/B showed a need).
+- **Section 4 trials, left off** (as the base ships them; for the console): `vivapinata_shader_noearly`,
+  `audio_xma_kick_without_lock`, `BLUR_LOCALIZE_PROMOTED_MEMBERS`, `audio_xma_kick_wake_idle_only`,
+  `switch_yield_spin`, `banjo_display_sync`, `banjo_renut_core_layout`, `banjo_renut_deferred_chain`,
+  `banjo_deko3d_eager_kicks` / `banjo_deko3d_latency_trim` (eager kicks is on in the base's shipped toml: unchanged),
+  `banjo_deko3d_skin_once` / `light_branch` / `gpr32` (Banjo's shaders only: nothing here), `banjo_gpu_zcull_greater`.
+- **Three keys from the log**: `ultimate_renut_replay_inherit_same = false`, `sasrt_gpu_skip_inert_draws = false`,
+  `banjo_renut_tags_check = 256` ("Keys from the log").
+- **New here**: `banjo_renut_callbacks_at_waits` (on: the movie skip), `banjo_renut_smaa = false`,
+  `RENUT_ALPHA_TEST_UNORM8 = 1` (compile-time: the models' alpha test).
