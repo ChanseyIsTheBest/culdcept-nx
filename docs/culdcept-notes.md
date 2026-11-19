@@ -354,6 +354,8 @@ FL and FR only in every window. The game's mix does not depend on the configurat
     there (a proxy; 15-16 ms with the fast draw off). (emu18 does not count: started while another session compiled,
     its boot ran at 0.5-17 fps and the timed route ended on the title screen.) The fast draw is on again, built in and
     shipped; A/B 25 back in `renut_ab.toml`.
+  - **emu20** (the built-in defaults, no fast-draw key; commit 862b5706): the sign, the dialogue boxes, the card
+    panel and the battle HUD right for the whole route, 100 % fast draws, no stall, every verify line 0.
 
 ## Hot functions: the machine copies (2026-11-19)
 
