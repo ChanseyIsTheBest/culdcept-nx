@@ -515,3 +515,23 @@ From `out/console_runs/user5` (renut_005.log, rex_profile.log; the stack sampler
   the SDK's emulated Xenos never reached the title in 330 s. A recording of this fade from the console or Xenia would
   say whether the Xbox 360 shows the same; candidates if not: the first set's Z write (a depth pre-pass the device state
   does not show), its depth bias, or the per-mesh fade constants.
+
+## Local multiplayer: a second controller could not join (2026-11-19 evening, the user's report)
+
+- **Symptom** (console, the handheld plus a Pro Controller): in Versus, "Press A to join" took player 1 but never
+  player 2; once player 1 had joined twice, player 2's stick and D-pad did nothing. On the PC with scripted second and
+  third pads (`input_script_p2` / `_p3`, new test keys): player 2 joined only when a third pad was signed in, and
+  player 1 alone could not join at all.
+- **Traced** with `xam_user_trace` (each sign-in query with its guest caller) and `debug_watch_u32` (guest words logged on
+  change: the input manager 0x82D7CAC4, its active pad +100, its per-pad records +108 + pad x 20): the lobby's handler
+  (`sub_82248AB8`) asked `sub_822FB888` (signed in?) for pads 0-3 at once when only pad 0 pressed A, so every pad read A.
+- **Cause**: the game polls each port (`sub_82389E28` through `sub_823555B8`) and ignores XamInputGetState's result;
+  it reads the state buffer, a stack slot the previous port's poll had just filled. The SDK returned
+  DEVICE_NOT_CONNECTED for an empty port without touching the buffer, so every empty port read as a copy of the port
+  polled before it. The lobby's "which pad pressed" takes the last one: an empty, signed-out port, so no join (player
+  1 alone: ports 2-4 copied player 1; two pads: ports 3-4 copied player 2).
+- **Fix** (SDK, handoff to come): `xam_input_clear_disconnected` (true): XamInputGetState clears the state of a port with
+  no controller, as the console does. PC: player 2 joins, the game asks it for its own save ("Begin with this data?"),
+  its D-pad moves its cursor; player 1 alone joins. On the card at 20:29 for the user's test.
+- **Also**: `xam_guest_signin` now signs in a pad that connects after the game's sign-in screen (the game told with
+  XN_SYS_SIGNINCHANGED); `xam_signin_ui_opens` (off) was a first guess, kept as a key.
