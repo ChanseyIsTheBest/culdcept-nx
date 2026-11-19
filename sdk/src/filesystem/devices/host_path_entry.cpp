@@ -64,6 +64,17 @@ std::atomic<uint64_t> g_keep_reused{0};
 std::atomic<uint64_t> g_keep_parked{0};
 std::atomic<uint64_t> g_keep_evicted{0};
 std::atomic<uint64_t> g_keep_restats_skipped{0};
+std::atomic<uint64_t> g_keep_retries{0};
+
+// Closes every parked handle; how many there were.
+size_t DropAllParked() {
+  std::list<ParkedHandle> all;  // closed after the lock is let go
+  {
+    std::lock_guard lock(P().mutex);
+    all.swap(P().list);
+  }
+  return all.size();
+}
 
 }  // namespace
 
@@ -222,6 +233,18 @@ X_STATUS HostPathEntry::Open(uint32_t desired_access, File** out_file) {
   if (!file_handle) {
     file_handle = rex::filesystem::FileHandle::OpenExisting(
         host_path_, desired_access, static_cast<HostPathDevice*>(device_)->allow_share_delete());
+  }
+  // culdcept-nx (2026-11-20, filesystem_keep_open): an open that fails while handles are parked gives them all up and is
+  // tried once more, on any device (game data or saves): whatever limit the system puts on open files, the parked
+  // handles never take a slot a real open needs.
+  if (!file_handle) {
+    if (const size_t dropped = DropAllParked()) {
+      file_handle = rex::filesystem::FileHandle::OpenExisting(
+          host_path_, desired_access, static_cast<HostPathDevice*>(device_)->allow_share_delete());
+      if (g_keep_retries.fetch_add(1, std::memory_order_relaxed) < 20)
+        REXFS_WARN("[io] keep-open: opening '{}' failed with {} handles parked; all closed, opened again: {}",
+                   rex::path_to_utf8(host_path_), dropped, file_handle ? "opened" : "failed again");
+    }
   }
   if (!file_handle) {
     // TODO(benvanik): pick correct response.
