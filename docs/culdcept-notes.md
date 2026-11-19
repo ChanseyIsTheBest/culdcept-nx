@@ -491,7 +491,7 @@ From `out/console_runs/user5` (renut_005.log, rex_profile.log; the stack sampler
   20.1 against 20.1 / 20.0 beside it (28.0 against 20.0 before); horizontal detail of the text +5 %, of the portraits
   +12 %, of the 3D +3 %. The Banjo case the key was made for (a one-sided blur's halo) has no counterpart here.
 
-## The battle's end fade (2026-11-19 evening, the user's report; OPEN)
+## The battle's end fade (2026-11-19 evening, the user's report; CLOSED: the game's own look)
 
 - **Symptom**: as a battle fades back to the board, parts of the battle scene vanish (the river's near slope, a lava
   pillar), the water plane shows over the rocks and the rocks' backs show through (the user's three clips; PC Renut
@@ -509,7 +509,9 @@ From `out/console_runs/user5` (renut_005.log, rex_profile.log; the stack sampler
 - **Not an enhancement**: the same with `banjo_cpu_enhancements` and `banjo_noncpu_enhancements` off (fade_off2).
   Renut reads the depth control and colour mask straight from the device's packets (m_ControlPacket.DepthControl,
   m_ValuesPacket.ColorMask) for each draw.
-- **No reference yet**: the native renderer refuses Culdcept (Banjo TU3's device layout: it falls back to Renut), and
+- **Closed (2026-11-19 19:10)**: the user checked on real hardware: the Xbox 360 shows the same fade (the battle scene
+  drawn translucent with no depth among its meshes). Renut draws what the game sends; nothing to change.
+- **Before that, no reference**: the native renderer refuses Culdcept (Banjo TU3's device layout: it falls back to Renut), and
   the SDK's emulated Xenos never reached the title in 330 s. A recording of this fade from the console or Xenia would
   say whether the Xbox 360 shows the same; candidates if not: the first set's Z write (a depth pre-pass the device state
   does not show), its depth bias, or the per-mesh fade constants.
