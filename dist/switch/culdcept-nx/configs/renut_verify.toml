@@ -342,7 +342,7 @@ banjo_renut_depth_words_stencil = true
 # Package 32 (2026-10-18): the Xbox's pixel centres (half a pixel; Renut's renderer drew everything half a pixel up-left,
 # which the depth of field's blur turned into a 4-pixel halo around Kazooie and Banjo), and the point size limits read as
 # the hardware reads them. configs/banjo_renut_half_pixel_off.toml has the old placement.
-banjo_renut_half_pixel_offset = true
+banjo_renut_half_pixel_offset = false
 banjo_renut_point_minmax_radius = true
 # Package 33 (2026-10-18, GPU time on deko3d; docs/deko3d-renderer.md section 13). Colour resolves are drawn, not copied
 # on the copy engine (each copy idled the whole GPU before and after it); the depth of field reads the depth resolve's

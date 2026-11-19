@@ -57,6 +57,10 @@ SHIPPED = {
     # start with it on (docs/culdcept-notes.md, "The package's own settings in Ryujinx"). configs/renut_profile.toml
     # keeps it on for a console profile.
     'switch_profile_stacks': 'false',
+    # The user's report (2026-11-19): a faint white vertical line in the cutscenes' dialogue box. The half-pixel viewport
+    # move put the box's 2D quads half a texel off their art (the seam at x 461 sampled the texel beside it; text and
+    # portraits softer). Off for this game (docs/culdcept-notes.md, "The dialogue box's line").
+    'banjo_renut_half_pixel_offset': 'false',
 }
 DROP = re.compile(r'^\s*(katamari_\w+|banjo_cpu_native_sub_8[0-9A-Fa-f]{7})\s*=.*$', re.M)
 PLAY = {'log_level': '"off"', 'banjo_renut_diag_resolve_trace': 'false', 'banjo_renut_diag_gpu_shaders': 'false',

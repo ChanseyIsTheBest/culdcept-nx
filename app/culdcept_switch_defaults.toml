@@ -128,7 +128,11 @@ renut_post_process_precision = "Game"
 banjo_renut_blend_skip = false
 banjo_renut_alpha_to_mask_test = true
 banjo_renut_depth_words_stencil = true
-banjo_renut_half_pixel_offset = true
+# culdcept-nx (2026-11-19, the user's report: a faint white vertical line in the cutscenes' dialogue box): the half-pixel
+# viewport move for D3D9 pixel centres put the box's 2D quads half a texel off their art, so its seam at x 461 sampled the
+# texel beside it, and the text and portraits were softer. Off: the line gone (column 461 20.1 against 20.0 beside it,
+# 28.0 against 20.0 with it on), the text 5 % and the portraits 12 % sharper, the 3D the same (docs/culdcept-notes.md).
+banjo_renut_half_pixel_offset = false
 banjo_renut_point_minmax_radius = true
 banjo_deko3d_draw_resolves = true
 banjo_gpu_depth_words_view = true

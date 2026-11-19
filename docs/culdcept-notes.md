@@ -475,3 +475,41 @@ From `out/console_runs/user5` (renut_005.log, rex_profile.log; the stack sampler
   is not to be changed.
 - **Next for the hitches**: one board session with `configs/renut_profile.toml` (the stack sampler on) names the main
   thread's hot functions in them, for machine copies (the hot-function method) or a fix in the game's own code path.
+
+## The dialogue box's line (2026-11-19 evening, the user's report)
+
+- **Symptom**: a faint white vertical line in the cutscenes' dialogue box (x 461 at 1280x720, the box's full height),
+  on the console and on the PC with Renut alike (the user's Faustina screenshot; out/pc_runs/story1 too).
+- **Reproduced** from the user's own save (`out/user_save`, read over FTP; never in git): Load -> Continue -> To Next
+  Stage (Yes) -> the Colosseum's Faustina scene (out/pc_runs/dlg_hpo_on3). `seam_scan.py` (the session's scratchpad):
+  column 461 4-9 levels above its neighbours in every dialogue frame.
+- **Cause**: `banjo_renut_half_pixel_offset` (the viewport moved half a pixel for D3D9 pixel centres, PA_SU_VTX_CNTL
+  bit 0 clear: device word 0x2940 is right for this XDK, the game's own setter `sub_8217A768` writes it with dirty bit
+  35 as Renut's does). For Culdcept's 2D quads it puts the art half a texel off: the box's seam sampled the texel beside
+  it, and the text and portraits were softer.
+- **Fix**: off for this game (built-in defaults and every shipped toml). Measured on the PC (dlg_hpo_off): column 461
+  20.1 against 20.1 / 20.0 beside it (28.0 against 20.0 before); horizontal detail of the text +5 %, of the portraits
+  +12 %, of the 3D +3 %. The Banjo case the key was made for (a one-sided blur's halo) has no counterpart here.
+
+## The battle's end fade (2026-11-19 evening, the user's report; OPEN)
+
+- **Symptom**: as a battle fades back to the board, parts of the battle scene vanish (the river's near slope, a lava
+  pillar), the water plane shows over the rocks and the rocks' backs show through (the user's three clips; PC Renut
+  the same, Vulkan and D3D12).
+- **Reproduced** with the user's replay file (main menu -> Replay; out/user_save) on the PC, ~157-165 s into the run,
+  recorded with `banjo_record_s` (fade_renut, fade_log1-4) and logged with a new window for the draw log
+  (`banjo_renut_diag_draw_log_s` .. `_until_s`, one frame in `_every`; clears and resolves logged too).
+- **What the game sends in a fade frame** (out/pc_runs/fade_log3, frame 15767; log4 with resolves): clear all; the
+  board's 140 draws (opaque order, depth written); two depth-only clears (flag 0x10 = Z in Renut's and the XDK's
+  convention); then the battle backdrop twice, every mesh alpha-blended (SRC_ALPHA / INV_SRC_ALPHA, the second set's
+  two waterfalls additive) with RB_DEPTHCONTROL 0x712 (Z test LESS, no Z write) and colour mask F, in an order unlike
+  the battle's own (sorted); three more depth clears; two quads; the resolves (0x300, colour and depth cleared after) and
+  the composite. In battle frames the first set is 0x736 (LEQUAL, Z written). So in the fade the battle meshes do not
+  hide each other: the picture is the draw order.
+- **Not an enhancement**: the same with `banjo_cpu_enhancements` and `banjo_noncpu_enhancements` off (fade_off2).
+  Renut reads the depth control and colour mask straight from the device's packets (m_ControlPacket.DepthControl,
+  m_ValuesPacket.ColorMask) for each draw.
+- **No reference yet**: the native renderer refuses Culdcept (Banjo TU3's device layout: it falls back to Renut), and
+  the SDK's emulated Xenos never reached the title in 330 s. A recording of this fade from the console or Xenia would
+  say whether the Xbox 360 shows the same; candidates if not: the first set's Z write (a depth pre-pass the device state
+  does not show), its depth bias, or the per-mesh fade constants.
