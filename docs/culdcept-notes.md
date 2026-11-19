@@ -540,3 +540,22 @@ From `out/console_runs/user5` (renut_005.log, rex_profile.log; the stack sampler
   controller 1) each joined with A (the Switch's B: face buttons by position), loaded the save and took slots 1-3
   ("Chanseys" with pad icons 2, 3, 4). A fourth virtual pad is a fifth controller (no port for it); the handheld's own
   join (controller 1) was the user's earlier test. Screens: out/console_runs/mp4.
+
+## The movies through FFmpeg (2026-11-19 night, the user: "can you do the wmv decoder now please", "the native one")
+
+- **The movies**: data\MOVIE\*.wmv are ASF with WMV3 video (1280x720, 30 fps for CI_00-02 and the credits, 60 fps
+  for narration_* and complete_*; no B pictures) and WMA2 audio, played by the XDK's movie player with Microsoft's WMV9
+  decoder in guest code (~97 % of a console core while a movie plays; the movies presented at ~48 fps). Mapped by the
+  sasrt-nx session's read-only notes (its scratchpad's culdcept_xmv_report.md; the method is sasrt-nx's and tw2de_nx's).
+- **The hooks** (`app/src/cpu/culdcept_wmv_ffmpeg.cpp`, key `culdcept_wmv_ffmpeg`, 1): the codec interface's decode
+  `sub_8259EE00` (the frame's chunks taken through the guest's GetData `sub_8259EA38` until its last, as the guest's
+  decoder takes them, so the pts and the payload's release stay the guest's; FFmpeg's WMV3 decoder with the guest's
+  sequence header, V+84 / V+88), get output `sub_8259EE60` (FFmpeg's YUV420P written into the player's I420 buffer:
+  Y pitch W, then U and V pitch W / 2), flush `sub_8259ECF8` and destroy `sub_8259ED50`. All are reached only through
+  the codec's table (no direct callers). Mode 2: the game's decoder runs and is shown, FFmpeg decodes the same bytes
+  (captured at the stream node's fetch `sub_8256FEE8`) and the planes are compared.
+- **FFmpeg**: the SDK's copy already compiled the WMV3 / VC-1 sources ("fork addition") but never switched them on:
+  `sdk/thirdparty/FFmpeg/config.h` now includes `config_masseffect_wmv3.h` (an untracked base input, force-added);
+  the app links libavcodec / libavutil.
+- **PC check**: mode 2 on the intro (I and P frames): every frame bit-identical (0 samples differ in Y, U and V). Mode 1:
+  the three intro movies (171, 200 and 100 frames) all decoded, 0 failed, 0 damaged; the title as before.

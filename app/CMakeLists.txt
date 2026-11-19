@@ -191,6 +191,7 @@ set(RENUT_SOURCES
     src/main.cpp
     src/culdcept_keys.cpp
     src/culdcept_diag.cpp  # culdcept-nx: diagnostics of the game's own functions (keys off)
+    src/cpu/culdcept_wmv_ffmpeg.cpp  # culdcept-nx (2026-11-19): the movies' WMV3 video by FFmpeg (culdcept_wmv_ffmpeg)
     src/game_menu.cpp  # blur-nx (2026-11-18): the game menu (A+B+X+Y+L+R on the Switch, F8 on the PC)
     src/blur_small_alloc.cpp  # blur-nx (2026-11-17, #220; port 151): small C++ allocations per thread (Switch; 32 MB)
     # katamari-nx (2026-10-31): DLC packages in the "dlc" folder next to the NRO installed at start (reNut upstream's).
@@ -867,6 +868,11 @@ foreach(_dep imgui xxhash renderdoc)
             $<TARGET_PROPERTY:${_dep},INTERFACE_INCLUDE_DIRECTORIES>)
     endif()
 endforeach()
+# culdcept-nx (2026-11-19, from sasrt-nx): src/cpu/culdcept_wmv_ffmpeg.cpp calls FFmpeg's WMV3 decoder itself (on the PC its own
+# copy beside the runtime DLL's, which keeps XMA's).
+if(TARGET libavcodec)
+    target_link_libraries(renut PRIVATE libavcodec libavutil)
+endif()
 
 # Nintendo Switch: renut.nro next to the ELF. On the SD card it goes in
 # sdmc:/switch/banjo-nx/ with the extracted disc in game_root/ beside it.

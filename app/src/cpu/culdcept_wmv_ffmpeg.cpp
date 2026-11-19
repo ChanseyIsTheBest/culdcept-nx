@@ -1,0 +1,416 @@
+// culdcept-nx (2026-11-19, the user: "can you do the wmv decoder now please", "the native one"; the method of sasrt-nx's
+// src/cpu/sasrt_usm_ffmpeg.cpp and tw2de_nx's tw2de_usm_ffmpeg.cpp, credit both; the guest's movie player mapped by the
+// sasrt-nx session's read-only notes of the same day): Culdcept Saga's movies (data\MOVIE\*.wmv: ASF, WMV3 1280x720 at 30
+// or 60 fps, no B pictures) decoded by FFmpeg on the host instead of Microsoft's WMV9 decoder in guest code (on the
+// console the guest decoder took ~97 % of a core while a movie played, which presented at ~48 fps).
+//
+// The guest codec's interface C (44 bytes, filled by sub_8259F3E0): +4 destroy sub_8259ED50(C), +8 decode
+// sub_8259EE00(C, u32* pcb), +12 get output sub_8259EE60(C, buf, size, u32* pcb, u32*, u64* pts, u32* flag), +16 flush
+// sub_8259ECF8(C), +32 its wrapper V (+32 width, +36 height, +68 the WMV9 decoder, +72 the frame's pts, +84 / +88 the
+// sequence header and its length, +108 the frame's I420 size), +40 GetData sub_8259EA38(C, offset, u8** p, min, u32* n,
+// u32* not_end): the frame's ASF payload a chunk at a time, status 10 and not_end 0 with its last. All five are reached
+// only through tables (no direct callers), so the hooks below take every call.
+//
+// culdcept_wmv_ffmpeg: 0 the game's decoder; 1 FFmpeg: the frame's chunks taken through GetData as the guest's decoder
+// takes them (the pts kept as it keeps it), decoded, and written as I420 into the player's buffer by get output; 2 both:
+// the game's decoder runs and its picture is shown, FFmpeg decodes the same bytes (taken as the stream node hands them
+// out, sub_8256FEE8) and the planes are compared ([wmv] lines).
+#include <rex/cvar.h>
+#include <rex/hook.h>
+#include <rex/logging.h>
+#include <rex/ppc/func.h>
+#include <rex/system/xmemory.h>
+#include <fmt/format.h>
+
+#include <algorithm>
+#include <atomic>
+#include <chrono>
+#include <cstdint>
+#include <cstring>
+#include <mutex>
+#include <string>
+#include <unordered_map>
+#include <vector>
+
+extern "C" {
+#include <libavcodec/avcodec.h>
+#include <libavutil/frame.h>
+#include <libavutil/mem.h>
+#include <libavutil/pixfmt.h>
+}
+
+REXCVAR_DEFINE_INT32(culdcept_wmv_ffmpeg, 1, "Culdcept",
+                     "The movies' WMV3 video: 0 the game's decoder (guest code), 1 FFmpeg on the host, 2 both, compared "
+                     "([wmv] log lines; the game's picture is shown)")
+    .range(0, 2);
+
+REX_EXTERN(__imp__sub_8259EE00);  // decode (C, u32* pcb)
+REX_EXTERN(__imp__sub_8259EE60);  // get output (C, buf, size, u32* pcb, u32*, u64* pts, u32* flag)
+REX_EXTERN(__imp__sub_8259ECF8);  // flush (C)
+REX_EXTERN(__imp__sub_8259ED50);  // destroy (C)
+REX_EXTERN(__imp__sub_8259EA38);  // GetData (C, offset, u8** p, min, u32* n, u32* not_end)
+REX_EXTERN(__imp__sub_8256FEE8);  // the stream node's payload fetch (S, u8** p, u32* n, ...)
+REX_EXTERN(__imp__sub_8259E960);  // the decoder's status to an HRESULT
+
+namespace {
+
+uint32_t Ld32(const uint8_t *base, uint32_t va) {
+  uint32_t v;
+  std::memcpy(&v, base + va, 4);
+  return __builtin_bswap32(v);
+}
+uint16_t Ld16(const uint8_t *base, uint32_t va) {
+  uint16_t v;
+  std::memcpy(&v, base + va, 2);
+  return __builtin_bswap16(v);
+}
+uint64_t Ld64(const uint8_t *base, uint32_t va) {
+  uint64_t v;
+  std::memcpy(&v, base + va, 8);
+  return __builtin_bswap64(v);
+}
+void St32(uint8_t *base, uint32_t va, uint32_t v) {
+  if (!va)
+    return;
+  v = __builtin_bswap32(v);
+  std::memcpy(base + va, &v, 4);
+  rex::memory::MarkStoreCardsAt(base, va, 4);
+}
+void St64(uint8_t *base, uint32_t va, uint64_t v) {
+  if (!va)
+    return;
+  v = __builtin_bswap64(v);
+  std::memcpy(base + va, &v, 8);
+  rex::memory::MarkStoreCardsAt(base, va, 8);
+}
+
+constexpr uint32_t kV = 32;             // C+32: the wrapper V
+constexpr uint32_t kWidth = 32;         // V+32
+constexpr uint32_t kHeight = 36;        // V+36
+constexpr uint32_t kPts = 72;           // V+72 (u64)
+constexpr uint32_t kSequence = 84;      // V+84: the sequence header (ASF stream properties' extra bytes)
+constexpr uint32_t kSequenceLen = 88;   // V+88 (u16)
+constexpr uint32_t kFrameSize = 108;    // V+108: width * height * 3 / 2
+constexpr uint32_t kStatusOk = 0, kStatusNoMoreOutput = 9;
+
+struct Movie {
+  std::mutex mutex;
+  AVCodecContext *avctx = nullptr;
+  AVPacket *packet = nullptr;
+  AVFrame *frame = nullptr;
+  bool have = false;               // a picture decoded and not yet taken by get output
+  std::vector<uint8_t> bytes;      // this frame's
+  std::vector<uint8_t> captured;   // mode 2: what the guest's decoder took
+  uint64_t frames = 0, decoded = 0, failed = 0, damaged = 0, compared = 0;
+  double decode_ms = 0.0, copy_ms = 0.0;
+  uint64_t timed = 0;
+  std::chrono::steady_clock::time_point since{};
+  uint32_t width = 0, height = 0;
+};
+
+std::mutex g_movies_mutex;
+std::unordered_map<uint32_t, Movie *> g_movies;  // by the guest codec's address
+
+Movie &MovieFor(uint32_t c) {
+  std::lock_guard lock(g_movies_mutex);
+  Movie *&m = g_movies[c];
+  if (!m)
+    m = new Movie();
+  return *m;
+}
+
+void CloseDecoder(Movie &m) {
+  if (m.frame)
+    av_frame_free(&m.frame);
+  if (m.packet)
+    av_packet_free(&m.packet);
+  if (m.avctx)
+    avcodec_free_context(&m.avctx);
+  m.have = false;
+}
+
+// FFmpeg's WMV3 decoder for this movie: the sequence header the guest keeps (V+84, 4 or 5 bytes), its size.
+bool OpenDecoder(Movie &m, const uint8_t *base, uint32_t v) {
+  if (m.avctx)
+    return true;
+  const AVCodec *codec = avcodec_find_decoder(AV_CODEC_ID_WMV3);
+  if (!codec) {
+    static std::atomic<bool> said{false};
+    if (!said.exchange(true))
+      REXLOG_WARN("[wmv] FFmpeg has no WMV3 decoder in this build: the game's decoder plays the movies");
+    return false;
+  }
+  m.avctx = avcodec_alloc_context3(codec);
+  m.width = Ld32(base, v + kWidth);
+  m.height = Ld32(base, v + kHeight);
+  m.avctx->width = int(m.width);
+  m.avctx->height = int(m.height);
+  m.avctx->coded_width = int(m.width);
+  m.avctx->coded_height = int(m.height);
+  m.avctx->flags |= AV_CODEC_FLAG_LOW_DELAY;  // each picture out as it is decoded (no B pictures in these movies)
+  m.avctx->thread_count = 1;
+  const uint32_t seq = Ld32(base, v + kSequence), seq_len = Ld16(base, v + kSequenceLen);
+  if (seq && seq_len && seq_len < 64) {
+    m.avctx->extradata = static_cast<uint8_t *>(av_mallocz(seq_len + AV_INPUT_BUFFER_PADDING_SIZE));
+    std::memcpy(m.avctx->extradata, base + seq, seq_len);
+    m.avctx->extradata_size = int(seq_len);
+  }
+  if (avcodec_open2(m.avctx, codec, nullptr) < 0) {
+    REXLOG_WARN("[wmv] FFmpeg's WMV3 decoder did not open ({}x{}, sequence header of {} bytes)", m.width, m.height,
+                seq_len);
+    avcodec_free_context(&m.avctx);
+    return false;
+  }
+  m.packet = av_packet_alloc();
+  m.frame = av_frame_alloc();
+  std::string hex;
+  for (uint32_t i = 0; i < seq_len && i < 8; ++i)
+    hex += fmt::format("{:02X} ", base[seq + i]);
+  REXLOG_INFO("[wmv] FFmpeg's WMV3 decoder for a {}x{} movie (sequence header {}; culdcept_wmv_ffmpeg {})", m.width,
+              m.height, hex, REXCVAR_GET(culdcept_wmv_ffmpeg));
+  return true;
+}
+
+// One frame's bytes through FFmpeg: m.have and m.frame.
+void Decode(Movie &m, const uint8_t *base, uint32_t v, const std::vector<uint8_t> &bytes) {
+  m.have = false;
+  ++m.frames;
+  if (bytes.empty() || !OpenDecoder(m, base, v)) {
+    ++m.failed;
+    return;
+  }
+  av_packet_unref(m.packet);
+  if (av_new_packet(m.packet, int(bytes.size())) < 0)
+    return;
+  std::memcpy(m.packet->data, bytes.data(), bytes.size());
+  if (avcodec_send_packet(m.avctx, m.packet) >= 0)
+    m.have = avcodec_receive_frame(m.avctx, m.frame) >= 0;
+  if (!m.have) {
+    if (++m.failed <= 8)
+      REXLOG_WARN("[wmv] FFmpeg gave no picture for frame {} ({} bytes)", m.frames, bytes.size());
+    return;
+  }
+  ++m.decoded;
+  if (m.frame->decode_error_flags || (m.frame->flags & AV_FRAME_FLAG_CORRUPT))
+    ++m.damaged;
+}
+
+// The frame's chunks through the guest's GetData (C, 0, &p, 4, &n, &not_end) until its last, as the guest's decoder
+// takes them: the pts (V+72) and the payload's release stay the guest's. Out-arguments in a scratch area below the stack.
+void TakeFrame(PPCContext &ctx, uint8_t *base, uint32_t c, std::vector<uint8_t> &bytes) {
+  bytes.clear();
+  const uint32_t r1 = ctx.r1.u32;
+  const uint32_t frame = r1 - 128;
+  const uint32_t p_out = frame + 80, n_out = frame + 84, end_out = frame + 88;
+  for (int i = 0; i < 4096; ++i) {
+    ctx.r1.u64 = frame;
+    ctx.r3.u64 = c;
+    ctx.r4.u64 = 0;
+    ctx.r5.u64 = p_out;
+    ctx.r6.u64 = 4;
+    ctx.r7.u64 = n_out;
+    ctx.r8.u64 = end_out;
+    __imp__sub_8259EA38(ctx, base);
+    const uint32_t status = ctx.r3.u32;
+    const uint32_t p = Ld32(base, p_out), n = Ld32(base, n_out), not_end = Ld32(base, end_out);
+    if (p && n)
+      bytes.insert(bytes.end(), base + p, base + p + n);
+    if ((status != 0 && status != 10) || !n || !not_end)
+      break;
+  }
+  ctx.r1.u64 = r1;
+}
+
+// FFmpeg's picture (YUV420P) into the player's I420 buffer: Y pitch W, then U and V pitch W / 2.
+void WriteI420(Movie &m, uint8_t *base, uint32_t buf, uint32_t w, uint32_t h) {
+  const AVFrame *f = m.frame;
+  const uint32_t fw = std::min<uint32_t>(w, uint32_t(f->width)), fh = std::min<uint32_t>(h, uint32_t(f->height));
+  const uint32_t planes[3] = {buf, buf + w * h, buf + w * h + (w / 2) * (h / 2)};
+  for (int k = 0; k < 3; ++k) {
+    const uint32_t pw = k ? fw / 2 : fw, ph = k ? fh / 2 : fh, pitch = k ? w / 2 : w;
+    for (uint32_t y = 0; y < ph; ++y)
+      std::memcpy(base + planes[k] + y * pitch, f->data[k] + size_t(y) * size_t(f->linesize[k]), pw);
+  }
+  rex::memory::MarkStoreCardsAt(base, buf, w * h * 3 / 2);
+}
+
+void TimeLine(Movie &m, uint32_t c, double decode_ms, double copy_ms) {
+  const auto now = std::chrono::steady_clock::now();
+  m.decode_ms += decode_ms;
+  m.copy_ms += copy_ms;
+  ++m.timed;
+  if (m.since.time_since_epoch().count() == 0)
+    m.since = now;
+  if (now - m.since >= std::chrono::seconds(10)) {
+    REXLOG_INFO("[wmv] {:08X}: {} frames by FFmpeg in {:.1f} s ({}x{}): {:.2f} ms decoding and {:.2f} ms copying a "
+                "frame; {} decoded, {} not, {} damaged so far",
+                c, m.timed, std::chrono::duration<double>(now - m.since).count(), m.width, m.height,
+                m.decode_ms / double(m.timed), m.copy_ms / double(m.timed), m.decoded, m.failed, m.damaged);
+    m.decode_ms = m.copy_ms = 0.0;
+    m.timed = 0;
+    m.since = now;
+  }
+}
+
+thread_local Movie *t_capture = nullptr;  // mode 2: the movie whose decode call is running on this thread
+
+}  // namespace
+
+// Decode: one frame.
+REX_HOOK_RAW(sub_8259EE00) {
+  const int mode = REXCVAR_GET(culdcept_wmv_ffmpeg);
+  if (mode == 0) {
+    __imp__sub_8259EE00(ctx, base);
+    return;
+  }
+  const uint32_t c = ctx.r3.u32, pcb = ctx.r4.u32;
+  const uint32_t v = Ld32(base, c + kV);
+  Movie &m = MovieFor(c);
+  std::lock_guard lock(m.mutex);
+  static std::atomic<bool> said{false};
+  if (!said.exchange(true))
+    REXLOG_INFO("[wmv] the movies' video: {} (culdcept_wmv_ffmpeg {})",
+                mode == 1 ? "FFmpeg on the host" : "the game's decoder and FFmpeg, compared", mode);
+  if (mode == 2) {
+    m.captured.clear();
+    t_capture = &m;
+    __imp__sub_8259EE00(ctx, base);  // the game's decoder; its payload fetches captured
+    t_capture = nullptr;
+    const uint32_t result = ctx.r3.u32;
+    Decode(m, base, v, m.captured);
+    ctx.r3.u64 = result;
+    return;
+  }
+  const auto t0 = std::chrono::steady_clock::now();
+  TakeFrame(ctx, base, c, m.bytes);
+  if (m.bytes.empty()) {
+    // Nothing more in the stream: the game's decoder answers as it would (it finds no bytes either).
+    ctx.r3.u64 = c;
+    ctx.r4.u64 = pcb;
+    __imp__sub_8259EE00(ctx, base);
+    return;
+  }
+  Decode(m, base, v, m.bytes);
+  const auto t1 = std::chrono::steady_clock::now();
+  St32(base, pcb, m.have ? Ld32(base, v + kFrameSize) : 0);
+  ctx.r3.u64 = m.have ? kStatusOk : kStatusNoMoreOutput;
+  __imp__sub_8259E960(ctx, base);
+  if (m.have)
+    TimeLine(m, c, std::chrono::duration<double, std::milli>(t1 - t0).count(), 0.0);
+}
+
+// Get output: the decoded frame into the player's buffer (I420).
+REX_HOOK_RAW(sub_8259EE60) {
+  const int mode = REXCVAR_GET(culdcept_wmv_ffmpeg);
+  if (mode == 0) {
+    __imp__sub_8259EE60(ctx, base);
+    return;
+  }
+  const uint32_t c = ctx.r3.u32, buf = ctx.r4.u32, size = ctx.r5.u32, pcb = ctx.r6.u32, p7 = ctx.r7.u32,
+                 pts = ctx.r8.u32, flag = ctx.r9.u32;
+  const uint32_t v = Ld32(base, c + kV);
+  Movie &m = MovieFor(c);
+  std::lock_guard lock(m.mutex);
+  const uint32_t w = Ld32(base, v + kWidth), h = Ld32(base, v + kHeight);
+  if (mode == 2) {
+    __imp__sub_8259EE60(ctx, base);  // the game's picture into buf
+    const uint32_t result = ctx.r3.u32;
+    if (m.have && m.compared < 40 && Ld32(base, pcb) != 0) {
+      ++m.compared;
+      const AVFrame *f = m.frame;
+      const uint32_t planes[3] = {buf, buf + w * h, buf + w * h + (w / 2) * (h / 2)};
+      std::string line;
+      uint64_t differing = 0;
+      for (int k = 0; k < 3; ++k) {
+        const uint32_t pw = k ? w / 2 : w, ph = k ? h / 2 : h, pitch = pw;
+        uint64_t sum = 0, n = 0;
+        uint32_t worst = 0;
+        for (uint32_t y = 0; y < ph && y < uint32_t(k ? f->height / 2 : f->height); ++y)
+          for (uint32_t x = 0; x < pw && x < uint32_t(k ? f->width / 2 : f->width); ++x) {
+            const uint8_t a = base[planes[k] + y * pitch + x], b = f->data[k][size_t(y) * size_t(f->linesize[k]) + x];
+            const uint32_t d = a > b ? a - b : b - a;
+            sum += d;
+            differing += d != 0;
+            worst = std::max(worst, d);
+            ++n;
+          }
+        line += fmt::format(" {} mean {:.3f} worst {}", "YUV"[k], n ? double(sum) / double(n) : 0.0, worst);
+      }
+      REXLOG_INFO("[wmv] {:08X} frame {} (type {}) {}x{}: game vs FFmpeg:{}; {} samples differ", c, m.frames,
+                  av_get_picture_type_char(f->pict_type), w, h, line, differing);
+    }
+    m.have = false;
+    ctx.r3.u64 = result;
+    return;
+  }
+  const uint32_t frame_size = Ld32(base, v + kFrameSize);
+  if (frame_size > size || (h & 1)) {  // as the game's: E_ too small / odd height
+    ctx.r3.u64 = 0x80500006u;
+    return;
+  }
+  uint32_t status = kStatusNoMoreOutput;
+  if (m.have && m.frame->format == AV_PIX_FMT_YUV420P) {
+    const auto t0 = std::chrono::steady_clock::now();
+    WriteI420(m, base, buf, w, h);
+    m.copy_ms += std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - t0).count();
+    St32(base, pcb, frame_size);
+    St32(base, p7, 0);
+    status = kStatusOk;
+  } else {
+    if (m.have && m.frame->format != AV_PIX_FMT_YUV420P) {
+      static std::atomic<int> said{0};
+      if (said.fetch_add(1) < 4)
+        REXLOG_WARN("[wmv] FFmpeg's picture is in pixel format {}, not YUV420P: not shown", int(m.frame->format));
+    }
+    St32(base, pcb, 0);
+    St32(base, p7, 0);
+  }
+  m.have = false;
+  St64(base, pts, Ld64(base, v + kPts));
+  St32(base, flag, 1);
+  ctx.r3.u64 = status;
+  __imp__sub_8259E960(ctx, base);
+}
+
+// Flush (a seek, a stop): FFmpeg's references go too.
+REX_HOOK_RAW(sub_8259ECF8) {
+  const uint32_t c = ctx.r3.u32;
+  {
+    Movie &m = MovieFor(c);
+    std::lock_guard lock(m.mutex);
+    if (m.avctx)
+      avcodec_flush_buffers(m.avctx);
+    m.have = false;
+  }
+  __imp__sub_8259ECF8(ctx, base);
+}
+
+// Destroy: the movie's FFmpeg decoder freed (the next movie's codec may take the same address).
+REX_HOOK_RAW(sub_8259ED50) {
+  const uint32_t c = ctx.r3.u32;
+  {
+    Movie &m = MovieFor(c);
+    std::lock_guard lock(m.mutex);
+    if (m.avctx && (m.frames || m.failed))
+      REXLOG_INFO("[wmv] {:08X}: movie closed: {} frames, {} decoded by FFmpeg, {} not, {} damaged", c, m.frames,
+                  m.decoded, m.failed, m.damaged);
+    CloseDecoder(m);
+    m.frames = m.decoded = m.failed = m.damaged = m.compared = 0;
+    m.timed = 0;
+    m.since = {};
+  }
+  __imp__sub_8259ED50(ctx, base);
+}
+
+// Mode 2: the payload fragments the stream node hands the game's decoder, taken as they go (the video decode thread's
+// decode call only: t_capture).
+REX_HOOK_RAW(sub_8256FEE8) {
+  Movie *m = t_capture;
+  const uint32_t pp = ctx.r4.u32, pn = ctx.r5.u32;
+  __imp__sub_8256FEE8(ctx, base);
+  if (m && int32_t(ctx.r3.u32) >= 0 && pp && pn) {
+    const uint32_t p = Ld32(base, pp), n = Ld32(base, pn);
+    if (p && n && n < (16u << 20))
+      m->captured.insert(m->captured.end(), base + p, base + p + n);
+  }
+}
