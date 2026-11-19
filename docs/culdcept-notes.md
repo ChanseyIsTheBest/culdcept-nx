@@ -559,3 +559,21 @@ From `out/console_runs/user5` (renut_005.log, rex_profile.log; the stack sampler
   the app links libavcodec / libavutil.
 - **PC check**: mode 2 on the intro (I and P frames): every frame bit-identical (0 samples differ in Y, U and V). Mode 1:
   the three intro movies (171, 200 and 100 frames) all decoded, 0 failed, 0 damaged; the title as before.
+
+## The board stutter, profiled on the console (2026-11-20 00:01-00:07, the user's replay, `banjo_slow_frame_profile_ms` 40)
+
+Console (the FFmpeg build, CPU 1020 MHz), the replay's board and battles, 4 minutes with the app's sampler and the stack
+sampler on (out/console_runs/prof1; named with `tools/switch-cpu-profile.py` and that build's ELF):
+- **How often**: ~230 frames of 40 ms or more (about one a second on the board; the longest 430 ms), the board's 1 % lows
+  ~10 fps while the mean holds 58 fps.
+- **Threads**: the game's main thread 35 % of a core on average (68 % peak), Renut's render thread 16 % (33 %, core 1),
+  each game worker under 5 %, audio ~1 % (core 3); the process 80 % of 400 %; the system core 56-64 % idle.
+- **Inside the stutter frames** (the main thread's samples in them): 18 % file system calls (fsdev open, its timestamp
+  query and close: the game opens the same archives again and again during play, DATA00.RSP 11 times, the layout*.RSL
+  files, the se_*.xma sounds; ~4-5 ms an open, the worst over 100 ms); ~22 % one call chain of game code
+  (sub_822BC1B0 -> sub_82346270 -> sub_8234C090 -> sub_8234DED8 / sub_82353820 / sub_823507C0: integer bit-shifting
+  loops, by its shape the data just read being decompressed); 9 % sub_82374F48 (a first-fit walk of a linked free list:
+  the game's allocator, 8 % of the main thread overall); 6.5 % sub_82380170; and waits: the render thread's queue
+  (6 %), the input read's latency sleep (5 %), Sleep (6 %).
+- **Levers** (not done): keep the game's archive files open (an open costs several SD-card IPCs; the [io] lines count
+  22-37 opens every 15 s); machine copies of the decompressor chain and the allocator walk (the hot-function method).
