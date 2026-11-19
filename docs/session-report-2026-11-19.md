@@ -12,7 +12,8 @@ and replays). Details and evidence: `docs/culdcept-notes.md`; the timeline: `doc
 | Console (the user's, handheld and docked) | Boot, movies (now decoded natively, smooth), title, Cepter creation with the Switch keyboard, save, the story, the board and its battles, Versus with up to four controllers (three of them virtual pads in the console test); the board at a mean of 58 fps with stutters (below) |
 | PC (Renut on Vulkan) | The same, at 60 fps; every machine copy and the IDCT native checked on every call (see "Measured") |
 | Ryujinx (Renut on deko3d, the Switch NRO) | The route to the first battle at about 60 fps; every verify line 0 differences |
-| SD card folder | `D:\culdceptsaga\sdcard\switch\culdcept-nx` (rc4 plus the extracted disc, hard links to `D:\culdceptsaga\game`); not in git, not uploaded |
+| SD card folder | `D:\culdceptsaga\sdcard\switch\culdcept-nx` (rc6 plus the extracted disc, hard links to `D:\culdceptsaga\game`); not in git, not uploaded |
+| The user's card | rc6's NRO (md5 aa861031..., read back after the upload) and configs/ put on `/switch/culdcept-nx` over FTP at 2026-11-20 08:10, the user's yes; culdcept.toml there was rc6's already; not yet started on the console |
 | Package | `D:\culdceptsaga\builds\2026-11-20_0621_rc6` (commit 507786a3; rc5 of 04:19, rc4 of 2026-11-19 17:17 and earlier superseded): NRO (43.0 MB), culdcept.toml (shipped), configs/ (with `renut_profile_slow.toml`, the stutter profile's, and `culdcept_shipped.toml`), DKSH cache, ELF, source snapshot, README, PACKAGE_NOTES (what changed since rc4). The SD folder holds rc6 (06:21) |
 | Web installer | `D:\culdceptsaga\culdcept-nx-installer` (the template's copy with Culdcept's game.json and release/); not published |
 
