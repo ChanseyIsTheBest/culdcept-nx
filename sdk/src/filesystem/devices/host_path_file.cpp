@@ -686,6 +686,14 @@ HostPathFile::~HostPathFile() {
   if (counted_window_) {
     g_live_windows.fetch_sub(1, std::memory_order_relaxed);
   }
+  // culdcept-nx (2026-11-20, filesystem_keep_open): a read-only open of a read-only device leaves its handle parked for
+  // the next open of the same file (HostPathEntry::Park).
+  const bool wants_write =
+      (file_access() & (FileAccess::kGenericWrite | FileAccess::kFileWriteData |
+                        FileAccess::kFileAppendData | FileAccess::kGenericAll)) != 0;
+  if (file_handle_ && entry() && entry()->is_read_only() && !wants_write) {
+    static_cast<HostPathEntry*>(entry())->Park(std::move(file_handle_));
+  }
 }
 
 void HostPathFile::Destroy() {
