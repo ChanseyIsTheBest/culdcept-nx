@@ -38,8 +38,10 @@
 #include <cmath>
 #include <cstdint>
 #include <cstring>
+#include <type_traits>  // culdcept-nx: the Huffman native's guard-form decline
 
 #include <rex/ppc/context.h>
+#include <rex/ppc/func.h>  // culdcept-nx: REX_EXTERN (the Huffman native's check runs the original)
 
 #if defined(__aarch64__)
 #include <arm_neon.h>
@@ -53,6 +55,7 @@
 #define REX_FMADDS(a, b, c) rex::ppc::FmaddsSingle((a), (b), (c))
 #endif
 #include <rex/ppc/diet_ops.h>  // katamari-nx: rex::ppc::SingleToDoublePure
+#include <simde/arm/neon.h>      // culdcept-nx: the JPEG natives' lanes (NEON on the Switch, SIMDe's own on the PC)
 
 // katamari-nx: the in-run A/B's target in its off half (renut_engine/gpu/banjo_renut_tuning.cpp).
 #include <atomic>
@@ -73,7 +76,9 @@ enum : uint32_t {
   kFlush = 3,
   kAudioFilter = 4,
   kXAudioMix = 5,
-  kNatives = 6
+  kIdct = 6,     // culdcept-nx (2026-11-20): the game's JPEG inverse DCT, sub_82353820
+  kHuffman = 7,  // culdcept-nx (2026-11-20): the game's JPEG Huffman decoder of one MCU, sub_8234DED8
+  kNatives = 8
 };
 extern uint8_t g_state[kNatives];
 uint8_t Init(uint32_t which);
@@ -780,5 +785,501 @@ template <class S>
 }
 
 }  // namespace n_rex_XAudioMixFrameBufferChannel
+
+// culdcept-nx (2026-11-20): sub_82353820 - the game's 8x8 integer inverse DCT, run for every block of every JPEG it decodes
+// (the card art it loads on the board: console profile out/console_runs/prof1, the main thread's slow frames, 5.3 %, under
+// sub_8234C590 <- sub_8234C090 <- sub_82346270 <- sub_822BC1B0). r3 = the decompressor (*(r3 + 288) + 128 is the
+// range-limit table), r4 = the component (*(r4 + 80): its 64 multipliers, words), r5 = the 64 coefficients (int16, row
+// after row), r6 = the eight output row pointers, r7 = the output column. A leaf: its workspace is 64 words in the red
+// zone at r1 - 384 (rows of 32 bytes), all of them written.
+//
+// What the guest code does, followed exactly, in 32-bit wrapping arithmetic (its mullw and mulli feed only add, subf,
+// rlwinm and srawi, which use the low word):
+//   * per column: when its coefficients in rows 1-7 are all zero, (c0 * q0) << 2 into all eight workspace rows; otherwise
+//     p = c * q, the even part (z1 = (p2 + p6) * 4433, t2 = z1 - p6 * 15137, t3 = z1 + p2 * 6270, t0 = (p0 + p4) << 13,
+//     t1 = (p0 - p4) << 13) and the odd part (z5 = (p7 + p3 + p5 + p1) * 9633 with 2446, 16819, 25172, 12299, -7373,
+//     -20995, -16069, -3196), each of the eight results (x + 1024) >> 11;
+//   * per row: when its words 1-7 are all zero, eight bytes of table[((w0 + 16) >> 5) & 1023]; otherwise the same two parts,
+//     each result table[((x + 0x20000) >> 18) & 1023].
+// Here four columns, then four rows, a step in NEON lanes (through SIMDe, so the PC's guard checks the same lane logic the
+// Switch runs), both forms computed and each lane taking the one its branch would.
+// Declined (nothing written): a range that is not one straight stretch of host memory, and the overlaps the guest code would
+// read back differently (the workspace over the coefficients or the multipliers; an output row over the workspace, the row
+// pointers or the range-limit table).
+// Scratch not reproduced (hand.txt): r3-r10, the guest code's working values. The link register is: the guest code's
+// first instruction is a bl to the register-save routine, and the recompiled function leaves ctx.lr at its return
+// address, 0x82353828 (the PC guard's first run found it as the one difference).
+namespace n_82353820 {
+
+using I4 = simde_int32x4_t;
+
+// Four big-endian int16 as int32 lanes.
+[[gnu::always_inline]] inline I4 Coef4(const uint8_t* p) {
+  return simde_vmovl_s16(simde_vreinterpret_s16_u8(simde_vrev16_u8(simde_vld1_u8(p))));
+}
+// Four big-endian words.
+[[gnu::always_inline]] inline I4 Words4(const uint8_t* p) {
+  return simde_vreinterpretq_s32_u8(simde_vrev32q_u8(simde_vld1q_u8(p)));
+}
+[[gnu::always_inline]] inline void StoreWords4(uint8_t* p, I4 v) {
+  simde_vst1q_u8(p, simde_vrev32q_u8(simde_vreinterpretq_u8_s32(v)));
+}
+[[gnu::always_inline]] inline I4 Mul(I4 a, int32_t k) { return simde_vmulq_n_s32(a, k); }
+[[gnu::always_inline]] inline I4 Add(I4 a, I4 b) { return simde_vaddq_s32(a, b); }
+[[gnu::always_inline]] inline I4 Sub(I4 a, I4 b) { return simde_vsubq_s32(a, b); }
+
+// The even and odd parts on eight inputs; out[i] = (x_i + kRound) >> kShift, in the guest code's output order.
+template <int kShift, int32_t kRound>
+[[gnu::always_inline]] inline void Parts(const I4 (&p)[8], I4 (&out)[8]) {
+  const I4 z1 = Mul(Add(p[2], p[6]), 4433);
+  const I4 t2 = Sub(z1, Mul(p[6], 15137));
+  const I4 t3 = Add(z1, Mul(p[2], 6270));
+  const I4 t0 = simde_vshlq_n_s32(Add(p[0], p[4]), 13);
+  const I4 t1 = simde_vshlq_n_s32(Sub(p[0], p[4]), 13);
+  const I4 e10 = Add(t0, t3), e13 = Sub(t0, t3), e11 = Add(t1, t2), e12 = Sub(t1, t2);
+  const I4 a1 = Add(p[7], p[1]), a2 = Add(p[5], p[3]), a3 = Add(p[7], p[3]), a4 = Add(p[5], p[1]);
+  const I4 z5 = Mul(Add(a3, a4), 9633);
+  const I4 b1 = Mul(a1, -7373), b2 = Mul(a2, -20995);
+  const I4 b3 = Sub(z5, Mul(a3, 16069)), b4 = Sub(z5, Mul(a4, 3196));
+  const I4 o0 = Add(Add(Mul(p[7], 2446), b1), b3);
+  const I4 o1 = Add(Add(Mul(p[5], 16819), b4), b2);
+  const I4 o2 = Add(Add(Mul(p[3], 25172), b3), b2);
+  const I4 o3 = Add(Add(Mul(p[1], 12299), b4), b1);
+  const I4 r = simde_vdupq_n_s32(kRound);
+  out[0] = simde_vshrq_n_s32(Add(Add(e10, o3), r), kShift);
+  out[7] = simde_vshrq_n_s32(Add(Sub(e10, o3), r), kShift);
+  out[1] = simde_vshrq_n_s32(Add(Add(e11, o2), r), kShift);
+  out[6] = simde_vshrq_n_s32(Add(Sub(e11, o2), r), kShift);
+  out[2] = simde_vshrq_n_s32(Add(Add(e12, o1), r), kShift);
+  out[5] = simde_vshrq_n_s32(Add(Sub(e12, o1), r), kShift);
+  out[3] = simde_vshrq_n_s32(Add(Add(e13, o0), r), kShift);
+  out[4] = simde_vshrq_n_s32(Add(Sub(e13, o0), r), kShift);
+}
+
+// a, b, c, d (lanes 0-3 each) -> the four columns as rows.
+[[gnu::always_inline]] inline void Transpose4(I4 a, I4 b, I4 c, I4 d, I4& o0, I4& o1, I4& o2, I4& o3) {
+  const simde_int32x4x2_t ab = simde_vtrnq_s32(a, b), cd = simde_vtrnq_s32(c, d);
+  o0 = simde_vcombine_s32(simde_vget_low_s32(ab.val[0]), simde_vget_low_s32(cd.val[0]));
+  o1 = simde_vcombine_s32(simde_vget_low_s32(ab.val[1]), simde_vget_low_s32(cd.val[1]));
+  o2 = simde_vcombine_s32(simde_vget_high_s32(ab.val[0]), simde_vget_high_s32(cd.val[0]));
+  o3 = simde_vcombine_s32(simde_vget_high_s32(ab.val[1]), simde_vget_high_s32(cd.val[1]));
+}
+
+[[gnu::always_inline]] inline bool Apart(uint32_t a, uint32_t n, uint32_t b, uint32_t m) {
+  return uint64_t(a) + n <= b || uint64_t(b) + m <= a;
+}
+
+template <class S>
+[[gnu::always_inline]] inline bool Native(PPCContext& __restrict ctx, uint8_t* base, [[maybe_unused]] S& s) {
+  if (!On(kIdct)) [[unlikely]] return false;
+  const uint32_t coef = ctx.r5.u32, rows = ctx.r6.u32, col = ctx.r7.u32, ws = ctx.r1.u32 - 384u;
+  if (!detail::Straight(ctx.r4.u32 + 80u, 4) || !detail::Straight(ctx.r3.u32 + 288u, 4)) [[unlikely]] return false;
+  const uint32_t mult = __builtin_bswap32(*reinterpret_cast<const uint32_t*>(::banjo::hot::Raw(base, ctx.r4.u32 + 80u)));
+  const uint32_t table =
+      __builtin_bswap32(*reinterpret_cast<const uint32_t*>(::banjo::hot::Raw(base, ctx.r3.u32 + 288u))) + 128u;
+  if (!detail::Straight(coef, 128) || !detail::Straight(mult, 256) || !detail::Straight(ws, 256) ||
+      !detail::Straight(rows, 32) || !detail::Straight(table, 1024)) [[unlikely]]
+    return false;
+  if (!Apart(ws, 256, coef, 128) || !Apart(ws, 256, mult, 256)) [[unlikely]] return false;
+  uint32_t out[8];
+  const uint8_t* row_words = ::banjo::hot::Raw(base, rows);
+  for (uint32_t r = 0; r < 8; ++r) {
+    uint32_t w;
+    std::memcpy(&w, row_words + 4 * r, 4);
+    out[r] = __builtin_bswap32(w) + col;
+    if (!detail::Straight(out[r], 8) || !Apart(out[r], 8, ws, 256) || !Apart(out[r], 8, rows, 32) ||
+        !Apart(out[r], 8, table, 1024)) [[unlikely]]
+      return false;
+  }
+  s.Hand(kIdct, 64);
+  ctx.lr = 0x82353828u;  // as the original leaves it (its bl to the register-save routine)
+
+  // Columns, four at a time: W[h][r] = workspace row r, columns 4h .. 4h + 3.
+  const uint8_t* c = ::banjo::hot::Raw(base, coef);
+  const uint8_t* q = ::banjo::hot::Raw(base, mult);
+  I4 W[2][8];
+  for (uint32_t h = 0; h < 2; ++h) {
+    I4 k[8], p[8];
+    for (uint32_t r = 0; r < 8; ++r) {
+      k[r] = Coef4(c + 16 * r + 8 * h);
+      p[r] = simde_vmulq_s32(k[r], Words4(q + 32 * r + 16 * h));
+    }
+    I4 full[8];
+    Parts<11, 1024>(p, full);
+    const I4 ac = simde_vorrq_s32(simde_vorrq_s32(simde_vorrq_s32(k[1], k[2]), simde_vorrq_s32(k[3], k[4])),
+                                  simde_vorrq_s32(simde_vorrq_s32(k[5], k[6]), k[7]));
+    const simde_uint32x4_t dc_only = simde_vceqq_s32(ac, simde_vdupq_n_s32(0));
+    const I4 dc = simde_vshlq_n_s32(p[0], 2);
+    for (uint32_t r = 0; r < 8; ++r) W[h][r] = simde_vbslq_s32(dc_only, dc, full[r]);
+  }
+  if (!s.Note(ws, 256)) [[unlikely]] return true;
+  ::banjo::hot::Card(base, ws, 256);
+  uint8_t* wp = ::banjo::hot::Raw(base, ws);
+  for (uint32_t r = 0; r < 8; ++r) {
+    StoreWords4(wp + 32 * r, W[0][r]);
+    StoreWords4(wp + 32 * r + 16, W[1][r]);
+  }
+
+  // Rows, four at a time: X[j] = word j of rows 4g .. 4g + 3.
+  const uint8_t* t = ::banjo::hot::Raw(base, table);
+  for (uint32_t g = 0; g < 2; ++g) {
+    I4 X[8];
+    Transpose4(W[0][4 * g], W[0][4 * g + 1], W[0][4 * g + 2], W[0][4 * g + 3], X[0], X[1], X[2], X[3]);
+    Transpose4(W[1][4 * g], W[1][4 * g + 1], W[1][4 * g + 2], W[1][4 * g + 3], X[4], X[5], X[6], X[7]);
+    I4 full[8];
+    Parts<18, 0x20000>(X, full);
+    const I4 ac = simde_vorrq_s32(simde_vorrq_s32(simde_vorrq_s32(X[1], X[2]), simde_vorrq_s32(X[3], X[4])),
+                                  simde_vorrq_s32(simde_vorrq_s32(X[5], X[6]), X[7]));
+    const simde_uint32x4_t dc_only = simde_vceqq_s32(ac, simde_vdupq_n_s32(0));
+    const I4 dc = simde_vshrq_n_s32(Add(X[0], simde_vdupq_n_s32(16)), 5);
+    const I4 mask = simde_vdupq_n_s32(1023);
+    int32_t idx[8][4];
+    for (uint32_t j = 0; j < 8; ++j) simde_vst1q_s32(idx[j], simde_vandq_s32(simde_vbslq_s32(dc_only, dc, full[j]), mask));
+    for (uint32_t i = 0; i < 4; ++i) {
+      const uint32_t r = 4 * g + i;
+      uint8_t bytes[8];
+      for (uint32_t j = 0; j < 8; ++j) bytes[j] = t[idx[j][i]];
+      if (!s.Note(out[r], 8)) [[unlikely]] return true;
+      ::banjo::hot::Card(base, out[r], 8);
+      std::memcpy(::banjo::hot::Raw(base, out[r]), bytes, 8);
+    }
+  }
+  return true;
+}
+
+}  // namespace n_82353820
+
+// culdcept-nx (2026-11-20): sub_8234DED8 - the game's baseline Huffman decoder of one MCU (decode_mcu's place in the JPEG
+// library the game links), with its bit-buffer refill sub_8234DB88 and its slow decode sub_8234DCF8 worked in: the card art
+// it decodes on the board (console profile out/console_runs/prof1, the main thread's slow frames: 9.5 % in this function
+// and 1.2 % in the refill, under sub_8234C590 <- sub_8234C090 <- sub_82346270 <- sub_822BC1B0). r3 = the decompressor,
+// r4 = the MCU's block pointers. The guest code keeps its bit reader in a struct on its stack and calls the refill (a
+// function with a frame and an indirect call in it) for every few bytes; here the reader lives in host registers.
+//
+// What the guest code does, followed exactly:
+//   * the refill: unless a marker was met (r3 + 380), bytes are shifted into the 32-bit buffer until it holds 25 bits;
+//     0xFF 0x00 is a 0xFF, 0xFF then another byte stores that byte as the marker and stops; after a marker a request for
+//     more bits than are left warns (declined here);
+//   * a symbol: the 8-bit look-ahead (the derived table's +144 bit counts, +1168 symbols) when 8 bits are there, else
+//     the slow decode from 1 or 9 bits through maxcode (+0), valoffset (+72) and the public table's values (+140 -> +17);
+//     past 16 bits it warns (declined);
+//   * the DC: s bits extended through the image's tables at 0x820F21C8 (+0 test, +64 offset), added to the component's
+//     last value (r3 + 324 gives the component of each block), stored as the block's word 0 when the DC is needed (the
+//     entropy decoder's +152 bytes); the AC: run / size symbols, each value at the natural-order position (0x820F2088),
+//     or only skipped when the block's AC is not needed (+162 bytes);
+//   * at the end: the source's next byte and count, the bit buffer, its bit count and the four last DC values written
+//     back, the restart count (+36) decremented, r3 = 1.
+// Every write waits until the whole MCU is decoded, so a decline writes nothing. Declined: a restart due, the decoder's
+// "insufficient data" flag, the source running dry (the guest code would call its fill_input_buffer), any warning, more
+// than 10 blocks or a DC size over 15, a component index over 3, and blocks over the state or tables the decoder reads.
+// Not reproduced: the guest code's stack frames (its reader struct, its saved registers) and its scratch registers; r3 as
+// the original returns it (hand.txt exact=r3).
+// The guard cannot repeat this function (the refill's indirect call), so it checks itself: culdcept_hand_huffman_verify
+// decodes without writing, runs the original and compares the blocks and the state with what it would have written.
+// In the guard's logged form it declines: the copy then reaches the refill's call as the original does and the hook
+// counts as not comparable (the PC guard's first run, with the native in the logged form too, reported the paths as
+// different: the native reaches no call, the original's statements do). Its ctx.lr is not the original's (that one is
+// the last call's return address inside it, a value no caller reads).
+namespace n_8234DED8 {
+
+[[gnu::always_inline]] inline uint32_t L32(uint8_t* base, uint32_t a) {
+  uint32_t w;
+  std::memcpy(&w, ::banjo::hot::Raw(base, a), 4);
+  return __builtin_bswap32(w);
+}
+[[gnu::always_inline]] inline uint32_t L8(uint8_t* base, uint32_t a) { return *::banjo::hot::Raw(base, a); }
+[[gnu::always_inline]] inline void S32(uint8_t* base, uint32_t a, uint32_t v) {
+  v = __builtin_bswap32(v);
+  std::memcpy(::banjo::hot::Raw(base, a), &v, 4);
+}
+
+// The image's read-only tables (the generated code reads them as constants too, tools/ro_constants.py).
+struct Tables {
+  int32_t natural[80];       // 0x820F2088
+  int32_t test[16], add[16];  // 0x820F21C8, 0x820F2208
+};
+inline const Tables& Image(uint8_t* base) {
+  static const Tables t = [base] {
+    Tables x{};
+    for (uint32_t i = 0; i < 80; ++i) x.natural[i] = int32_t(L32(base, 0x820F2088u + 4 * i));
+    for (uint32_t i = 0; i < 16; ++i) {
+      x.test[i] = int32_t(L32(base, 0x820F21C8u + 4 * i));
+      x.add[i] = int32_t(L32(base, 0x820F2208u + 4 * i));
+    }
+    return x;
+  }();
+  return t;
+}
+
+struct Reader {
+  uint8_t* base;
+  uint32_t next, avail;  // the source manager's next byte and bytes left
+  uint32_t buf;          // the bit buffer
+  int32_t left;          // its bit count
+  uint32_t marker;       // r3 + 380
+  bool marker_new;
+};
+
+// sub_8234DB88. false: the guest code would call the source's fill_input_buffer or warn.
+[[gnu::always_inline]] inline bool Fill(Reader& b, int32_t nbits) {
+  if (b.marker == 0) {
+    while (b.left < 25) {
+      if (b.avail == 0) return false;
+      uint32_t c = L8(b.base, b.next);
+      ++b.next;
+      --b.avail;
+      if (c == 0xFF) {
+        do {
+          if (b.avail == 0) return false;
+          c = L8(b.base, b.next);
+          ++b.next;
+          --b.avail;
+        } while (c == 0xFF);
+        if (c != 0) {
+          b.marker = c;
+          b.marker_new = true;
+          return nbits <= b.left;
+        }
+        c = 0xFF;
+      }
+      b.buf = (b.buf << 8) | c;
+      b.left += 8;
+    }
+    return true;
+  }
+  return nbits <= b.left;
+}
+
+// (buf >> shift) & ((1 << n) - 1), as sraw / slw / and compute it for 0 <= shift <= 31 and 1 <= n <= 16.
+[[gnu::always_inline]] inline int32_t Bits(const Reader& b, int32_t n) {
+  return (int32_t(b.buf) >> b.left) & int32_t((1u << n) - 1u);
+}
+
+// sub_8234DCF8 from l bits. -1: declined (the source ran dry, or a code past 16 bits).
+[[gnu::always_inline]] inline int32_t Slow(Reader& b, uint32_t tbl, int32_t l) {
+  if (b.left < l && !Fill(b, l)) return -1;
+  b.left -= l;
+  int32_t code = Bits(b, l);
+  uint32_t p = tbl + 4u * uint32_t(l);
+  while (code > int32_t(L32(b.base, p))) {
+    code = int32_t(uint32_t(code) << 1);
+    if (b.left < 1 && !Fill(b, 1)) return -1;
+    b.left -= 1;
+    p += 4;
+    ++l;
+    code |= (int32_t(b.buf) >> b.left) & 1;
+  }
+  if (l > 16) return -1;
+  const uint32_t pub = L32(b.base, tbl + 140u);
+  return int32_t(L8(b.base, pub + 17u + L32(b.base, tbl + 72u + 4u * uint32_t(l)) + uint32_t(code)));
+}
+
+// One symbol: the look-ahead, else the slow decode. -1: declined.
+[[gnu::always_inline]] inline int32_t Symbol(Reader& b, uint32_t tbl) {
+  int32_t from = 9;
+  if (b.left < 8) {
+    if (!Fill(b, 0)) return -1;
+    if (b.left < 8) from = 1;
+  }
+  if (from == 9) {
+    const uint32_t look = uint32_t(int32_t(b.buf) >> (b.left - 8)) & 0xFFu;
+    const int32_t nb = int32_t(L32(b.base, tbl + 144u + 4u * look));
+    if (nb != 0) {
+      b.left -= nb;
+      return int32_t(L8(b.base, tbl + 1168u + look));
+    }
+  }
+  return Slow(b, tbl, from);
+}
+
+// s value bits, extended. false: declined.
+[[gnu::always_inline]] inline bool Value(Reader& b, const Tables& t, int32_t s, int32_t& out) {
+  if (b.left < s && !Fill(b, s)) return false;
+  b.left -= s;
+  int32_t r = Bits(b, s);
+  if (r < t.test[s]) r += t.add[s];
+  out = r;
+  return true;
+}
+
+struct Write {
+  uint32_t addr;
+  uint16_t value;
+};
+
+struct Result {
+  Reader b;
+  int32_t dc[4];
+  uint32_t writes;
+};
+
+[[gnu::always_inline]] inline bool Apart(uint32_t a, uint32_t n, uint32_t b, uint32_t m) {
+  return uint64_t(a) + n <= b || uint64_t(b) + m <= a;
+}
+
+// The decode without a write. false: declined.
+[[gnu::always_inline]] inline bool Decode(PPCContext& ctx, uint8_t* base, Result& res, Write* w) {
+  const uint32_t cinfo = ctx.r3.u32, mcu = ctx.r4.u32;
+  const uint32_t ent = L32(base, cinfo + 408u);
+  if (L32(base, cinfo + 252u) != 0 && L32(base, ent + 36u) == 0) return false;  // a restart is due
+  if (L8(base, ent + 8u) != 0) return false;                                      // insufficient data
+  const int32_t blocks = int32_t(L32(base, cinfo + 320u));
+  if (blocks > 10) return false;
+  const uint32_t src = L32(base, cinfo + 24u);
+  Reader& b = res.b;
+  b.base = base;
+  b.next = L32(base, src);
+  b.avail = L32(base, src + 4u);
+  b.buf = L32(base, ent + 12u);
+  b.left = int32_t(L32(base, ent + 16u));
+  b.marker = L32(base, cinfo + 380u);
+  b.marker_new = false;
+  for (uint32_t i = 0; i < 4; ++i) res.dc[i] = int32_t(L32(base, ent + 20u + 4u * i));
+  const Tables& t = Image(base);
+  const uint32_t first = b.next;
+  uint32_t n = 0;
+  for (int32_t k = 0; k < blocks; ++k) {
+    const uint32_t blk = L32(base, mcu + 4u * uint32_t(k));
+    const uint32_t dct = L32(base, ent + 72u + 4u * uint32_t(k));
+    const uint32_t act = L32(base, ent + 112u + 4u * uint32_t(k));
+    // The block must not lie over what the decode reads (the guest code would read its own writes back).
+    if (!detail::Straight(blk, 128) || !Apart(blk, 128, cinfo, 512) || !Apart(blk, 128, ent, 256) || !Apart(blk, 128, mcu, 40) ||
+        !Apart(blk, 128, dct, 1424) || !Apart(blk, 128, act, 1424) || !Apart(blk, 128, src, 8))
+      return false;
+    int32_t s = Symbol(b, dct);
+    if (s < 0 || s > 15) return false;
+    if (s != 0 && !Value(b, t, s, s)) return false;
+    if (L8(base, ent + 152u + uint32_t(k)) != 0) {
+      const uint32_t ci = L32(base, cinfo + 324u + 4u * uint32_t(k));
+      if (ci > 3) return false;
+      res.dc[ci] = int32_t(uint32_t(res.dc[ci]) + uint32_t(s));
+      w[n++] = Write{blk, uint16_t(res.dc[ci])};
+    }
+    const bool ac = L8(base, ent + 162u + uint32_t(k)) != 0;
+    for (int32_t i = 1; i < 64; ++i) {
+      const int32_t sym = Symbol(b, act);
+      if (sym < 0) return false;
+      const int32_t run = sym >> 4, size = sym & 15;
+      if (size != 0) {
+        i += run;
+        if (ac) {
+          int32_t v;
+          if (!Value(b, t, size, v)) return false;
+          w[n++] = Write{blk + 2u * uint32_t(t.natural[i]), uint16_t(v)};
+        } else {
+          if (b.left < size && !Fill(b, size)) return false;
+          b.left -= size;
+        }
+      } else {
+        if (run != 15) break;
+        i += 15;
+      }
+    }
+  }
+  // The bytes consumed must not lie under a block either.
+  for (uint32_t i = 0; i < n; ++i)
+    if (!Apart(w[i].addr, 2, first, b.next - first)) return false;
+  res.writes = n;
+  return true;
+}
+
+[[gnu::always_inline]] inline void StoreState(PPCContext& ctx, uint8_t* base, const Result& res) {
+  const uint32_t cinfo = ctx.r3.u32;
+  const uint32_t ent = L32(base, cinfo + 408u), src = L32(base, cinfo + 24u);
+  S32(base, src, res.b.next);
+  S32(base, src + 4u, res.b.avail);
+  S32(base, ent + 12u, res.b.buf);
+  S32(base, ent + 16u, uint32_t(res.b.left));
+  for (uint32_t i = 0; i < 4; ++i) S32(base, ent + 20u + 4u * i, uint32_t(res.dc[i]));
+  S32(base, ent + 36u, L32(base, ent + 36u) - 1u);
+  if (res.b.marker_new) S32(base, cinfo + 380u, res.b.marker);
+}
+
+bool VerifyOn();  // culdcept_hand_huffman_verify (banjo_hot_guest.cpp), read once
+// One check's outcome (banjo_hot_guest.cpp counts them and logs the first differences).
+void Verified(bool same, const char* what, uint32_t addr, uint32_t want, uint32_t got);
+
+REX_EXTERN(__imp__sub_8234DED8);
+
+// The check: what this decode would leave (the blocks as they are with its writes applied, the state), then the original
+// for real, then the two compared.
+[[gnu::noinline]] inline void VerifyNote(PPCContext& ctx, uint8_t* base, const Result& res, const Write* w) {
+  const uint32_t cinfo = ctx.r3.u32, mcu = ctx.r4.u32;
+  const uint32_t ent = L32(base, cinfo + 408u), src = L32(base, cinfo + 24u);
+  const uint32_t blocks = L32(base, cinfo + 320u);
+  uint32_t blk[10];
+  uint8_t want[10][128];
+  for (uint32_t k = 0; k < blocks; ++k) {
+    blk[k] = L32(base, mcu + 4u * k);
+    std::memcpy(want[k], ::banjo::hot::Raw(base, blk[k]), 128);
+  }
+  for (uint32_t i = 0; i < res.writes; ++i)  // the last block that holds it, as the stores land in order
+    for (uint32_t k = blocks; k-- > 0;)
+      if (w[i].addr - blk[k] < 127u) {
+        want[k][w[i].addr - blk[k]] = uint8_t(w[i].value >> 8);
+        want[k][w[i].addr - blk[k] + 1] = uint8_t(w[i].value);
+        break;
+      }
+  const uint32_t restarts = L32(base, ent + 36u);
+  __imp__sub_8234DED8(ctx, base);
+  bool same = ctx.r3.u32 == 1;
+  if (!same) Verified(false, "r3", 0, 1, ctx.r3.u32);
+  for (uint32_t k = 0; k < blocks; ++k) {
+    const uint8_t* got = ::banjo::hot::Raw(base, blk[k]);
+    for (uint32_t j = 0; j < 128; j += 2)
+      if (got[j] != want[k][j] || got[j + 1] != want[k][j + 1]) {
+        Verified(false, "coefficient", blk[k] + j, uint32_t(want[k][j]) << 8 | want[k][j + 1],
+                 uint32_t(got[j]) << 8 | got[j + 1]);
+        same = false;
+      }
+  }
+  const auto word = [&](const char* what, uint32_t a, uint32_t v) {
+    const uint32_t got = L32(base, a);
+    if (got != v) {
+      Verified(false, what, a, v, got);
+      same = false;
+    }
+  };
+  word("next byte", src, res.b.next);
+  word("bytes left", src + 4u, res.b.avail);
+  word("bit buffer", ent + 12u, res.b.buf);
+  word("bit count", ent + 16u, uint32_t(res.b.left));
+  for (uint32_t i = 0; i < 4; ++i) word("last DC", ent + 20u + 4u * i, uint32_t(res.dc[i]));
+  word("restarts", ent + 36u, restarts - 1u);
+  if (res.b.marker_new) word("marker", cinfo + 380u, res.b.marker);
+  if (same) Verified(true, nullptr, 0, 0, 0);
+}
+
+template <class S>
+[[gnu::always_inline]] inline bool Native(PPCContext& __restrict ctx, uint8_t* base, [[maybe_unused]] S& s) {
+  if (!On(kHuffman)) [[unlikely]] return false;
+  if constexpr (std::is_same_v<S, ::banjo::hot::Logged>) return false;  // the guard's form: the copy runs
+  Result res;
+  Write w[640];
+  if (!Decode(ctx, base, res, w)) return false;
+  s.Hand(kHuffman, res.writes);
+  if (VerifyOn()) [[unlikely]] {
+    VerifyNote(ctx, base, res, w);  // the original has run, for real
+    return true;
+  }
+  const uint32_t cinfo = ctx.r3.u32;
+  const uint32_t ent = L32(base, cinfo + 408u), src = L32(base, cinfo + 24u);
+  for (uint32_t i = 0; i < res.writes; ++i) {
+    if (!s.Note(w[i].addr, 2)) [[unlikely]] return true;
+    ::banjo::hot::Card(base, w[i].addr, 2);
+    const uint16_t v = __builtin_bswap16(w[i].value);
+    std::memcpy(::banjo::hot::Raw(base, w[i].addr), &v, 2);
+  }
+  if (!s.Note(src, 8) || !s.Note(ent + 12u, 28) || (res.b.marker_new && !s.Note(cinfo + 380u, 4))) [[unlikely]]
+    return true;
+  ::banjo::hot::Card(base, src, 8);
+  ::banjo::hot::Card(base, ent + 12u, 28);
+  if (res.b.marker_new) ::banjo::hot::Card(base, cinfo + 380u, 4);
+  StoreState(ctx, base, res);
+  ctx.r3.u64 = 1;
+  return true;
+}
+
+}  // namespace n_8234DED8
 
 }  // namespace banjo::hand

@@ -189,23 +189,44 @@ REXCVAR_DEFINE_BOOL(banjo_hand_xaudio_mix, true, "Banjo/Enhancements",
                     "(one for the range); checked by the guard of the router's hook")
     .lifecycle(rex::cvar::Lifecycle::kInitOnly);
 
+// culdcept-nx (2026-11-20): the first of this game's own (app/src/cpu/hot/hand.txt gives the console evidence).
+REXCVAR_DEFINE_BOOL(culdcept_hand_idct, true, "Banjo/Enhancements",
+                    "Hand-written native of the game's JPEG inverse DCT (every 8x8 block of the card art it decodes "
+                    "on the board): the same 32-bit integer arithmetic four columns, then four rows, at a time in "
+                    "NEON lanes; bit-identical, checked by the guard of its hook")
+    .lifecycle(rex::cvar::Lifecycle::kInitOnly);
+REXCVAR_DEFINE_BOOL(culdcept_hand_huffman, true, "Banjo/Enhancements",
+                    "Hand-written native of the game's JPEG Huffman decoder of one MCU with its bit-buffer refill: "
+                    "the bit reader in host registers instead of a struct on the guest stack and a call for every "
+                    "few bytes; every write held until the MCU is decoded, declined (the original runs) where the "
+                    "source runs dry, a restart is due or the original would warn")
+    .lifecycle(rex::cvar::Lifecycle::kInitOnly);
+REXCVAR_DEFINE_BOOL(culdcept_hand_huffman_verify, false, "Banjo/Enhancements",
+                    "Check of the Huffman native (the guard cannot repeat its function): each call decodes without "
+                    "writing, runs the original, and compares the blocks and the decoder's state; '[hot] huffman' "
+                    "lines in the log. A test key (every call decodes twice)")
+    .lifecycle(rex::cvar::Lifecycle::kInitOnly);
+
 namespace banjo::hand {
 
 uint8_t g_state[kNatives] = {};
 
 namespace {
 constexpr const char* kNames[kNatives] = {"memcpy", "memset", "constant writers", "state flush writers",
-                                          "XAudio voice filter", "XAudio channel mix"};
+                                          "XAudio voice filter", "XAudio channel mix", "JPEG inverse DCT",
+                                          "JPEG Huffman decoder"};
 constexpr const char* kKeys[kNatives] = {"banjo_hand_memcpy", "banjo_hand_memset", "banjo_hand_constants",
                                          "banjo_hand_state_flush", "banjo_hand_audio_filter",
-                                         "banjo_hand_xaudio_mix"};
+                                         "banjo_hand_xaudio_mix", "culdcept_hand_idct", "culdcept_hand_huffman"};
 bool Own(uint32_t which) {
   return which == kMemcpy           ? bool(REXCVAR_GET(banjo_hand_memcpy))
          : which == kMemset         ? bool(REXCVAR_GET(banjo_hand_memset))
          : which == kConstants      ? bool(REXCVAR_GET(banjo_hand_constants))
          : which == kFlush          ? bool(REXCVAR_GET(banjo_hand_state_flush))
          : which == kAudioFilter    ? bool(REXCVAR_GET(banjo_hand_audio_filter))
-                                    : bool(REXCVAR_GET(banjo_hand_xaudio_mix));
+         : which == kXAudioMix      ? bool(REXCVAR_GET(banjo_hand_xaudio_mix))
+         : which == kIdct           ? bool(REXCVAR_GET(culdcept_hand_idct))
+                                    : bool(REXCVAR_GET(culdcept_hand_huffman));
 }
 // banjo_hot_count: calls by size, bucket 0 = size 0, bucket k = sizes [2^(k-1), 2^k).
 std::atomic<uint64_t> g_sizes[kNatives][34];
@@ -223,6 +244,30 @@ uint8_t Init(uint32_t which) {
 void Count(uint32_t which, uint32_t n) {
   g_sizes[which][n ? 32 - __builtin_clz(n) : 0].fetch_add(1, std::memory_order_relaxed);
 }
+
+// culdcept-nx (2026-11-20): the Huffman native's own check (banjo_hand_natives.h, n_8234DED8).
+namespace n_8234DED8 {
+namespace {
+std::atomic<uint64_t> g_checked{0}, g_different{0};
+}  // namespace
+bool VerifyOn() {
+  static const bool on = REXCVAR_GET(culdcept_hand_huffman_verify);
+  return on;
+}
+void Verified(bool same, const char* what, uint32_t addr, uint32_t want, uint32_t got) {
+  if (same) {
+    const uint64_t n = g_checked.fetch_add(1, std::memory_order_relaxed) + 1;
+    if ((n & (n - 1)) == 0 || n % 100000 == 0)
+      REXLOG_INFO("[hot] huffman: {} MCUs checked against the original, {} differences", n,
+                  g_different.load(std::memory_order_relaxed));
+    return;
+  }
+  const uint64_t d = g_different.fetch_add(1, std::memory_order_relaxed) + 1;
+  if (d <= 30)
+    REXLOG_ERROR("[hot] huffman DIFFERENCE {}: {} at {:#x}: native {:#x}, original {:#x} ({} MCUs checked)", d,
+                 what, addr, want, got, g_checked.load(std::memory_order_relaxed));
+}
+}  // namespace n_8234DED8
 
 }  // namespace banjo::hand
 

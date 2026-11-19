@@ -1,3 +1,7 @@
 # culdcept-nx: the localized native copies (tools/localize_native.py --list; banjo-nx's method, docs/enhancements.md
 # "Localized copies"). A line is "<address> [options] <what>". Filled from this game's profiles
 # (docs/culdcept-notes.md, "Hot functions").
+# culdcept-nx (2026-11-20): the functions of this game's hand-written natives (hand.txt; tools/localize_native.py takes
+# a hand.txt function out of the bulk list, so its copy, with the native in front, is made from this list).
+82353820 the JPEG inverse DCT of one 8x8 block (native culdcept_hand_idct in front)
+8234DED8 the JPEG Huffman decoder of one MCU (native culdcept_hand_huffman in front)

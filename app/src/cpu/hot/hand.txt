@@ -8,3 +8,10 @@
 #
 # Empty: a native is written only from this game's CONSOLE profile, past the guide's gate (docs/optimising-functions.md),
 # with the evidence recorded here. A PC or Ryujinx profile never qualifies.
+
+82353820   # rc4 console (out/console_runs/prof1, the board replay), main thread in its slow frames (40 ms or more of
+           # game-thread work) 5.3 %: the JPEG inverse DCT of the card art the game decodes on the board, one 8x8 block
+           # a call, all of it 32-bit integer multiplies and adds done one column, then one row, at a time
+8234DED8 exact=r3   # rc4 console (prof1, the board replay), main thread in its slow frames 9.5 % here and 1.2 % in its
+           # bit-buffer refill sub_8234DB88: the JPEG Huffman decode of the card art, the bit reader kept in a struct on
+           # the guest stack and a call into the refill for every few bytes (checked by culdcept_hand_huffman_verify)
