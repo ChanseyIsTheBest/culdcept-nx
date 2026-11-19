@@ -599,7 +599,10 @@ Done:
    it back (no open, timestamp or close request on the Switch). The size query of such a file no longer restats it (the
    files cannot change). PC, the board replay (verify4, 300 s): 595 opens took a parked handle, 726 closes parked
    theirs, 100 closed beyond the cap (the game rotates through more than 32 files), 54 size queries without a stat;
-   the opens left cost 0.02-0.12 ms each on the PC. The console's numbers: below, when measured.
+   the opens left cost 0.02-0.12 ms each on the PC.
+   Ryujinx (rc6's NRO, emuh1, 700 s to the first battle): 713 reopens from parked handles. An open that fails while
+   handles are parked closes them all and is tried once more (507786a3: the console's limit on open files was not
+   measured, and a save that fails to open would be worse than a stutter). The console's numbers: when measured.
 2. **Machine copies of everything in the profile that had none**: localized_bulk.txt 102 -> 256 (tools/switch_hot_bulk.py
    on prof1, `--min-samples 1 --merge`), the decoder chain and its callers among them (sub_8234DED8 and sub_822BC1B0 ran as
    their plain originals in prof1). 251 bulk copies made (3 forms the tool refuses stay generated code), 2 from
@@ -620,6 +623,8 @@ Done:
      guard's logged form it declines (verify3, with it running there too, reported the paths as different: the native
      reaches no call where the original's statements reach the refill's), so the guard counts the hook as not
      comparable (verify4: 201,600 calls, 0 differences).
+   - **Ryujinx** (rc6's NRO, the real Switch build: GCC and NEON; emuh1, the route to the first battle): the Huffman
+     decoder's check 16,384 MCUs, 0 differences; the hand's card art clean in the captures (the IDCT's NEON path).
    - Not given one: the colour conversion (four table lookups a pixel; a native would make the same lookups), the free
      and the wait above.
    - **A hand.txt function needs a line in localized.txt.** tools/localize_native.py takes a hand.txt function out of

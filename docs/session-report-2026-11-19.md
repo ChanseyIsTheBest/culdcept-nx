@@ -13,7 +13,7 @@ and replays). Details and evidence: `docs/culdcept-notes.md`; the timeline: `doc
 | PC (Renut on Vulkan) | The same, at 60 fps; every machine copy and the IDCT native checked on every call (see "Measured") |
 | Ryujinx (Renut on deko3d, the Switch NRO) | The route to the first battle at about 60 fps; every verify line 0 differences |
 | SD card folder | `D:\culdceptsaga\sdcard\switch\culdcept-nx` (rc4 plus the extracted disc, hard links to `D:\culdceptsaga\game`); not in git, not uploaded |
-| Package | `D:\culdceptsaga\builds\2026-11-20_0419_rc5` (commit 3fede365; rc4 of 2026-11-19 17:17 and earlier superseded): NRO (43.0 MB), culdcept.toml (shipped), configs/ (with `renut_profile_slow.toml`, the stutter profile's, and `culdcept_shipped.toml`), DKSH cache, ELF, source snapshot, README, PACKAGE_NOTES (what changed since rc4). The SD folder refreshed with it at 04:20 |
+| Package | `D:\culdceptsaga\builds\2026-11-20_0621_rc6` (commit 507786a3; rc5 of 04:19, rc4 of 2026-11-19 17:17 and earlier superseded): NRO (43.0 MB), culdcept.toml (shipped), configs/ (with `renut_profile_slow.toml`, the stutter profile's, and `culdcept_shipped.toml`), DKSH cache, ELF, source snapshot, README, PACKAGE_NOTES (what changed since rc4). The SD folder holds rc6 (06:21) |
 | Web installer | `D:\culdceptsaga\culdcept-nx-installer` (the template's copy with Culdcept's game.json and release/); not published |
 
 ## Fixes made for this game (all in culdcept-nx)
@@ -40,13 +40,17 @@ and replays). Details and evidence: `docs/culdcept-notes.md`; the timeline: `doc
 12. The board stutter (tonight; `docs/culdcept-notes.md`, the two stutter sections):
     - the profile read: ~230 frames of 40 ms or more in 4 minutes; in them 18 % file opens, ~22 % the game's JPEG
       decoder (the card art), 9 % the game's small-block free, 6.5 % a wait for its loader thread;
-    - the game's data files kept open (`filesystem_keep_open`, handoff 12): on the PC's board replay 595 reopens in
-      300 s took a parked handle (no file-system request); the console's share: PENDING (the next profile);
+    - the game's data files kept open (`filesystem_keep_open`, handoffs 12 and 18): on the PC's board replay 595
+      reopens in 300 s took a parked handle (no file-system request), in Ryujinx 713 in 700 s; an open that fails
+      while handles are parked closes them and tries again (the console's limit on open files is not measured);
+      the console's share: PENDING (the next profile);
     - machine copies of every function in the console profile that had none (102 -> 256), the decoder chain among them;
     - hand-written natives: the JPEG inverse DCT (`culdcept_hand_idct`, NEON lanes) and the Huffman decoder
       (`culdcept_hand_huffman`, the bit reader in registers); both bit-exact in unit tests (200,000 blocks; 44,924
       MCUs); on the PC the IDCT compared with the original on every call (604,800, 0 differences) and the Huffman
-      decoder by its own check (600,000 MCUs, 0 differences); PENDING: Ryujinx, the console;
+      decoder by its own check (600,000 MCUs, 0 differences); in Ryujinx (rc6's NRO, the route to the first battle,
+      700 s) the Huffman decoder's own check 16,384 MCUs, 0 differences, and the hand's card art clean (the IDCT's
+      NEON path); PENDING: the console;
     - not given a native, and why: the small-block free (its time is a list walk a native cannot shorten), the colour
       conversion (a native would make the same table lookups), the wait (time spent waiting for a file).
 
@@ -57,8 +61,8 @@ fixes". 17 patches; 01-12 and 14-17 apply together in order on 5017fe95 and on t
 is in the base already (port 191). Sent to the base's session (Ridge Racer 6's), which took all 16 at 2026-11-20 ~03:55
 as **ports 207-222** (committed locally in the base, not pushed; its docs at 32581b7d), every key and default as set
 here; 218 (the file cache) applied by hand beside sims3-nx's save fix (port 203); tested there on Katamari (PC and
-Switch builds, the PC and Ryujinx into a level, 0 errors, keep-open reusing 39 / 45 handles). Nothing of the base was
-changed from here.
+Switch builds, the PC and Ryujinx into a level, 0 errors, keep-open reusing 39 / 45 handles). Handoff 18 (the file
+cache's retry, 06:05) went in as 218's follow-up (3cf8012c). Nothing of the base was changed from here.
 
 | Patch | What |
 |---|---|
@@ -79,6 +83,7 @@ changed from here.
 | 15_late_guest_signin | Pads that connect after the sign-in screen are signed in as guests |
 | 16_input_script_more_pads | Test keys `input_script_p2` / `_p3` / `_p4` |
 | 17_draw_log_targets | The draw log's window, its targets' addresses, clears and resolves |
+| 18_keep_open_retry | 12's follow-up: a failed open gives up the parked handles and tries again |
 
 The base's built-pointer scan (the crash Sonic 4 Episode I's port fixed) on Culdcept: 1 candidate, a false positive; 0
 after the fix.
