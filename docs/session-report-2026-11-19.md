@@ -9,8 +9,8 @@ timeline: `docs/progress-log.md`; console steps: `docs/console-testing.md`.
 | Where | State |
 |---|---|
 | PC (Renut on Vulkan) | Boot, intro movies, title, menus, Cepter creation, save, the story (movies, field scenes, dialogue), the board map and the first board battle (dice, hand of cards, Spell Selection) at 60 fps; the picture clean (alpha test fixed) |
-| Ryujinx (Renut on deko3d, the Switch NRO) | The same route to the first battle at 60 fps (after two fixes: the movie skip's GPU callbacks, the fast draw's stale panels); every verify line 0 differences |
-| Package | `D:\culdceptsaga\builds\2026-11-19_0743_rc1` (commit 5af434e3): NRO (39.7 MB), culdcept.toml (shipped), configs/ (renut.toml, renut_play.toml, renut_ab.toml, verify, PGO, profile, 720 docked, MSAA 2x, dynamic, textures_plain), DKSH cache (46 variants), ELF, source snapshot, README, PACKAGE_NOTES (console testing) |
+| Ryujinx (Renut on deko3d, the Switch NRO) | The same route to the first battle at 60 fps (after two fixes: the movie skip's GPU callbacks, the fast draw's stale vertex layout for the 2D panels); every verify line 0 differences |
+| Package | `D:\culdceptsaga\builds\2026-11-19_1031_rc2` (commit 3c62c206; rc1 of 07:43 is superseded: it had the fast draw off): NRO (39.7 MB), culdcept.toml (shipped), configs/ (renut.toml, renut_play.toml, renut_ab.toml, verify, PGO, profile, 720 docked, MSAA 2x, dynamic, textures_plain), DKSH cache (46 variants), ELF, source snapshot, README, PACKAGE_NOTES (console testing) |
 | Web installer | `D:\culdceptsaga\culdcept-nx-installer`: a copy of renut_nx_ultimate_installer 2ce44cf with Culdcept's game.json, colours, icon and release/ (make_release.py: the NRO, the manifest of 5,860 game files); "shaders": false (the NRO carries the game's 7 shaders: 4 exist only at run time, 3 are version 0x10 containers the page's translator cannot read); not published |
 
 ## Fixes made for this game (all in culdcept-nx; base handoffs in `D:\culdceptsaga\out\handoff`)
@@ -28,6 +28,22 @@ timeline: `docs/progress-log.md`; console steps: `docs/console-testing.md`.
    SetFVF declaration is rewritten in place inside the device and the fast draw kept the old vertex layout (found
    with a field-forcing bisection: `kFieldDecl`). Fixed in the field map (handoff 07); the fast draw stays on.
 7. SMAA off (no composite to anchor it: the board and the HUD share one shader and one target).
+
+## Handoffs for the base (`D:\culdceptsaga\out\handoff`, README.md there; against 5017fe95, all eight apply together)
+
+| Patch | What |
+|---|---|
+| 01_container_10 | Version 0x10 shader containers (XDK 2.0.3424's run-time compiler) translated and accepted |
+| 02_renderdoc_game_frame | `banjo_renderdoc_game_s` gets its frame tick from the Swap (it captured nothing) |
+| 03_alpha_test_unorm8 | Alpha test on the 8-bit grid (compile-time, 0 = off in the base) |
+| 04_headless_keyboard_text | Test key: a headless keyboard prompt answers with given text |
+| 05_callbacks_at_waits | Renut's GPU callbacks also run at guest waits / sleeps (the movie-skip deadlock) |
+| 06_thread_suspend_log | Diagnostic: every NtResumeThread / NtSuspendThread logged |
+| 07_fast_draw_device_declaration | The device's own SetFVF declaration counts as `kFieldDecl` (the fast draw's stale vertex layout) |
+| 08_fast_force_diag | Diagnostic: field bits forced by time window, to bisect a fast-draw fault in one run |
+
+Notes there too: the generator's half-table jump fault, the diet / D3DX compiler finding, vivapinata-nx's bool
+constants, the installer's Katamari-only test, CG-13's census naming a copy's call line.
 
 ## Measured, and how
 
@@ -60,4 +76,7 @@ timeline: `docs/progress-log.md`; console steps: `docs/console-testing.md`.
 - The alpha-test fix changes the PC's picture to the console's (holes gone); on in this port, off in its handoff.
 - The web installer's NRO carries the game's 7 translated shaders (the page cannot make them): publishing it is yours
   to decide. Nothing was pushed or published.
+- `switch_profile_stacks` (the stack sampler) is on in the shipped toml, as the base ships it; once in Ryujinx the app
+  stopped inside the profiler's start (1 run of about 20). Turning it off in `culdcept.toml` is yours to decide;
+  `renut_play.toml` has it off.
 - No title update or DLC was needed.

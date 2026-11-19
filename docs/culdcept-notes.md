@@ -398,3 +398,16 @@ FL and FR only in every window. The game's mix does not depend on the configurat
   `banjo_renut_tags_check = 256` ("Keys from the log").
 - **New here**: `banjo_renut_callbacks_at_waits` (on: the movie skip), `banjo_renut_smaa = false`,
   `RENUT_ALPHA_TEST_UNORM8 = 1` (compile-time: the models' alpha test).
+
+## The package's own settings in Ryujinx (2026-11-19 10:39-11:26)
+
+- emu21 (the rc2 package's `culdcept.toml` and DKSH cache, 240 s, no input): the app stopped 4 s in, inside
+  `banjo::profiler::Start` (renut_app.h, OnPostSetup): the Switch CPU profiler wrote its start-up header and then
+  nothing (no 10 s window), the stall watch (started right after it) never started, no "Switch: in focus", the game
+  never began. The likeliest place is the stack sampler (`switch_profile_stacks = true`, the base's shipped value: it
+  pauses each thread every 1 ms to read its stack) left with a thread paused. Not seen again: emu22 (the same toml
+  plus `headless`), emu23 (plus SMAA on) and emu24 (the same toml unchanged) all booted to the title with their audio;
+  every route run (all with the sampler on) started too. **Left as the base ships it**, written down for the console:
+  a black screen at boot with no log past the "[enhancements]" lines is this; `configs/renut_play.toml` has the
+  sampler off.
+- emu24 (the shipped toml unchanged): the D3D device, focus, the game's audio, frames: the shipped settings boot.

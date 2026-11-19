@@ -27,6 +27,9 @@ Keep `sdmc:/switch/culdcept-nx/logs/` afterwards. What to look for in `renut_001
   where).
 - `[renut] SMAA`: frames with SMAA (see the notes' "SMAA").
 - `[audio]`: the stream's under-runs, if any.
+- A black screen at boot whose log stops after the `[enhancements]` lines (no "Switch: in focus"): seen once in
+  Ryujinx, inside the CPU profiler's start (its stack sampler, `switch_profile_stacks`); start again, and if it
+  repeats, use `configs/renut_play.toml` (the sampler off) and say so.
 
 Look at the board's 2D panels (the dialogue box under a portrait, the battle's Cepter / Creature Card panels,
 "Spell Selection"): in Ryujinx they went missing or showed another texture (red rectangles) until the fast draw's
