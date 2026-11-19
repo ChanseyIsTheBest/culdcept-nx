@@ -13,6 +13,11 @@ steps it leaves, written so that each one is a copy, a start and a log to keep. 
 3. Start it from the Homebrew Menu (title override: hold R on a game, for the full memory; an applet launch has too
    little).
 
+Ready-made on this PC (2026-11-19, the user's request): `D:\culdceptsaga\sdcard\switch\` is steps 1 and 2 done (the
+package's files and the extracted disc's 5,861 files in `game_root`, hard links to `D:\culdceptsaga\game`, so no
+second 4.6 GB on D:). Copy that `switch` folder to the SD card's root, merging with the one there. Never into git,
+never uploaded.
+
 ## 1. First start: the shipped settings (`culdcept.toml` as packaged)
 
 Logs on, the stall watch at 1 s. Play: the logos, the title (START), New Game, the Cepter creation (the on-screen
@@ -28,8 +33,9 @@ Keep `sdmc:/switch/culdcept-nx/logs/` afterwards. What to look for in `renut_001
 - `[renut] SMAA`: frames with SMAA (see the notes' "SMAA").
 - `[audio]`: the stream's under-runs, if any.
 - A black screen at boot whose log stops after the `[enhancements]` lines (no "Switch: in focus"): seen once in
-  Ryujinx, inside the CPU profiler's start (its stack sampler, `switch_profile_stacks`); start again, and if it
-  repeats, use `configs/renut_play.toml` (the sampler off) and say so.
+  Ryujinx, inside the CPU profiler's start, with its stack sampler on (`switch_profile_stacks`). The shipped
+  `culdcept.toml` has the sampler off since 2026-11-19 (your decision: the profiler stays on, its stack sampler off);
+  only `configs/renut_profile.toml` turns it on. If it shows with the shipped toml all the same, start again and say so.
 
 Look at the board's 2D panels (the dialogue box under a portrait, the battle's Cepter / Creature Card panels,
 "Spell Selection"): in Ryujinx they went missing or showed another texture (red rectangles) until the fast draw's

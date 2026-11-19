@@ -51,6 +51,12 @@ SHIPPED = {
     'ultimate_renut_replay_inherit_same': 'false',
     'sasrt_gpu_skip_inert_draws': 'false',
     'banjo_renut_tags_check': '256',
+    # The user's decision (2026-11-19): the profiler stays on (the SDK's Switch profiler: FPS, CPU and counters in
+    # logs/rex/rex_profile.log, the app's banjo_profiler.log, the GPU profile lines), its stack sampler off: it pauses
+    # every game thread each 1 ms, and once in Ryujinx (emu21, 1 run of about 20) the app stopped in the profiler's
+    # start with it on (docs/culdcept-notes.md, "The package's own settings in Ryujinx"). configs/renut_profile.toml
+    # keeps it on for a console profile.
+    'switch_profile_stacks': 'false',
 }
 DROP = re.compile(r'^\s*(katamari_\w+|banjo_cpu_native_sub_8[0-9A-Fa-f]{7})\s*=.*$', re.M)
 PLAY = {'log_level': '"off"', 'banjo_renut_diag_resolve_trace': 'false', 'banjo_renut_diag_gpu_shaders': 'false',

@@ -33,7 +33,8 @@ renut.toml        the shipped settings with logs on: Renut on deko3d, 720 lines 
                   (msaa_level 1: the game's own count is your decision), SMAA off (the game draws its board and HUD
                   with one shader into one target: nothing to anchor it on), no dynamic resolution, every exact
                   enhancement on as the base ships it, the items measured SLOWER ON THE CONSOLE in the base's ports
-                  off. A package carries it as culdcept.toml.
+                  off, the profiler on without its stack sampler (switch_profile_stacks false: no thread pauses). A
+                  package carries it as culdcept.toml.
 renut_play.toml   the same with the diagnostics and logs off (for playing).
 renut_ab.toml     the same with an in-run A/B list, 30 s halves, target 1 as the do-nothing control (a Vulkan-only
                   key). Stand still in one place (a board turn waiting for input) for 10+ minutes; the log's

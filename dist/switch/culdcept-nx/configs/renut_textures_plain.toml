@@ -53,7 +53,7 @@ banjo_show_fps = false
 banjo_stall_watch_seconds = 1
 # Profiling (on in every config except configs/banjo_cpu_verify.toml):
 # CPU: the SDK's sampler records every thread's code addresses into logs/rex/rex_profile.log.
-switch_profile_stacks = true
+switch_profile_stacks = false
 # The app's own sampler (logs/rex/banjo_profiler.log); configs/banjo_profile.toml turns it on as well.
 banjo_cpu_profiler = false
 

@@ -76,7 +76,7 @@ constants, the installer's Katamari-only test, CG-13's census naming a copy's ca
 - The alpha-test fix changes the PC's picture to the console's (holes gone); on in this port, off in its handoff.
 - The web installer's NRO carries the game's 7 translated shaders (the page cannot make them): publishing it is yours
   to decide. Nothing was pushed or published.
-- `switch_profile_stacks` (the stack sampler) is on in the shipped toml, as the base ships it; once in Ryujinx the app
-  stopped inside the profiler's start (1 run of about 20). Turning it off in `culdcept.toml` is yours to decide;
-  `renut_play.toml` has it off.
+- Decided (yours, 2026-11-19): the profiler stays on, its stack sampler (`switch_profile_stacks`) off in the shipped
+  toml and every config but `configs/renut_profile.toml` (once in Ryujinx the app stopped inside the profiler's start
+  with it on: 1 run of about 20).
 - No title update or DLC was needed.

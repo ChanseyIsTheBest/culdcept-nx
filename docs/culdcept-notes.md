@@ -407,7 +407,14 @@ FL and FR only in every window. The game's mix does not depend on the configurat
   never began. The likeliest place is the stack sampler (`switch_profile_stacks = true`, the base's shipped value: it
   pauses each thread every 1 ms to read its stack) left with a thread paused. Not seen again: emu22 (the same toml
   plus `headless`), emu23 (plus SMAA on) and emu24 (the same toml unchanged) all booted to the title with their audio;
-  every route run (all with the sampler on) started too. **Left as the base ships it**, written down for the console:
-  a black screen at boot with no log past the "[enhancements]" lines is this; `configs/renut_play.toml` has the
-  sampler off.
+  every route run (all with the sampler on) started too. Left as the base ships it at first, written down for the
+  console: a black screen at boot with no log past the "[enhancements]" lines is this.
+- **The user's decision (2026-11-19 afternoon): the profiler on, its stack sampler off** in the shipped toml
+  (`switch_profile_stacks = false` in `tools/make_culdcept_tomls.py`'s SHIPPED, so in renut.toml, renut_play, renut_ab
+  and every config except `configs/renut_profile.toml`). What stays on: the SDK's Switch profiler thread (FPS, CPU and
+  the counters in `logs/rex/rex_profile.log`: its "Stack sampling: disabled" mode), the stall watch, the GPU profile
+  lines. What goes: the 1 ms pauses of every game thread. Package rc3; emu25 (below) boots it.
+- emu25 (the new shipped toml, 180 s, no input): "Switch: in focus" at 1 s, the D3D device, the intro; rex_profile.log
+  "Stack sampling: disabled (1 ms)" with its windows written, 15 frame-pacing windows (about 58 fps once past the
+  logos), no `[stall]` line, every verify line 0 differences.
 - emu24 (the shipped toml unchanged): the D3D device, focus, the game's audio, frames: the shipped settings boot.
