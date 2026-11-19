@@ -317,6 +317,13 @@ def ftp_sizes(host, remote):
 def main():
     global SD_ROOT
     args = sys.argv[1:]
+    # culdcept-nx (2026-11-19, from sasrt-nx): --pad N (1-4): the virtual pad the presses go to (sys-botbase
+    # "2.6-files-kill-pads", the four-pad build: its "pad N" command; pads 2-4 attach when first used).
+    pad = 0
+    if '--pad' in args:
+        i = args.index('--pad')
+        pad = int(args[i + 1])
+        del args[i:i + 2]
     host = host_of(args)
     SD_ROOT = root_of(args)
     if not args:
@@ -324,6 +331,8 @@ def main():
     cmd, rest = args[0], args[1:]
     if cmd in ('shot', 'click', 'hold', 'chord', 'stick', 'title', 'version', 'heap', 'peek', 'raw'):
         b = Bot(host)
+        if pad:
+            b.send('pad %d' % pad)
         try:
             if cmd == 'shot':
                 out = rest[0] if rest else time.strftime('shot_%H%M%S.jpg')

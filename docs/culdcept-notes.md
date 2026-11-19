@@ -535,3 +535,8 @@ From `out/console_runs/user5` (renut_005.log, rex_profile.log; the stack sampler
   its D-pad moves its cursor; player 1 alone joins. On the card at 20:29 for the user's test.
 - **Also**: `xam_guest_signin` now signs in a pad that connects after the game's sign-in screen (the game told with
   XN_SYS_SIGNINCHANGED); `xam_signin_ui_opens` (off) was a first guess, kept as a key.
+- **Console check (2026-11-19 22:58-23:07, the user's request; sys-botbase "2.6-files-kill-pads", tools/switch_remote.py
+  `--pad N`)**: in the console's Versus lobby, virtual pads 1-3 (the game's controllers 2, 3 and 4: the handheld is
+  controller 1) each joined with A (the Switch's B: face buttons by position), loaded the save and took slots 1-3
+  ("Chanseys" with pad icons 2, 3, 4). A fourth virtual pad is a fifth controller (no port for it); the handheld's own
+  join (controller 1) was the user's earlier test. Screens: out/console_runs/mp4.
