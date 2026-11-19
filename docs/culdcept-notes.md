@@ -575,5 +575,55 @@ sampler on (out/console_runs/prof1; named with `tools/switch-cpu-profile.py` and
   loops, by its shape the data just read being decompressed); 9 % sub_82374F48 (a first-fit walk of a linked free list:
   the game's allocator, 8 % of the main thread overall); 6.5 % sub_82380170; and waits: the render thread's queue
   (6 %), the input read's latency sleep (5 %), Sleep (6 %).
-- **Levers** (not done): keep the game's archive files open (an open costs several SD-card IPCs; the [io] lines count
-  22-37 opens every 15 s); machine copies of the decompressor chain and the allocator walk (the hot-function method).
+- **Levers**: keep the game's archive files open (an open costs several SD-card IPCs; the [io] lines count 22-37 opens
+  every 15 s); machine copies of the decompressor chain and the allocator walk (the hot-function method). Done the next
+  night, and two of the readings above corrected (the next section).
+
+## The board stutter, worked on (2026-11-20 night, the user: "the 22% and 9% functions can all get hand natives make machine functions of everything else that doesn't have them let's also do 1. keep the data files open")
+
+What the profile's functions are (read from their code, prof1's stacks):
+- **The 22 % chain is a JPEG decoder**, the library the game links (its structures at the library's offsets): sub_8234DED8 is
+  the Huffman decode of one MCU, sub_8234DB88 its bit-buffer refill, sub_8234DCF8 the slow decode past 8 bits,
+  sub_82353820 the integer inverse DCT of one 8x8 block, sub_823507C0 the YCbCr-to-RGB conversion of a row,
+  sub_822BC1B0 the game's caller. The board decodes card art as it shows it.
+- **sub_82374F48 is the game's small-block free** (from its free, sub_82375178, for blocks of 128 bytes or less): it walks
+  the pool list from the head to the first pool whose first word is not zero and links the block there. Its time is the
+  walk, one dependent load per pool; a native would be the same loop (the machine copy already has it, with a prefetch).
+  Not given a native: nothing in it can be removed without changing the game's allocator.
+- **sub_82380170 waits**: the main thread polls a status word (sub_8237A338 reads it from a table) until the game's loader
+  thread finishes a read. Its share is waiting for a file; faster file access is what shrinks it.
+
+Done:
+1. **The data files kept open** (SDK, `filesystem_keep_open`, default on; `filesystem_keep_open_max` 32): a read-only open
+   of a read-only device leaves its host handle parked when the guest closes it, and the next open of the same file takes
+   it back (no open, timestamp or close request on the Switch). The size query of such a file no longer restats it (the
+   files cannot change). PC, the board replay (verify4, 300 s): 595 opens took a parked handle, 726 closes parked
+   theirs, 100 closed beyond the cap (the game rotates through more than 32 files), 54 size queries without a stat;
+   the opens left cost 0.02-0.12 ms each on the PC. The console's numbers: below, when measured.
+2. **Machine copies of everything in the profile that had none**: localized_bulk.txt 102 -> 256 (tools/switch_hot_bulk.py
+   on prof1, `--min-samples 1 --merge`), the decoder chain and its callers among them (sub_8234DED8 and sub_822BC1B0 ran as
+   their plain originals in prof1). 251 bulk copies made (3 forms the tool refuses stay generated code), 2 from
+   localized.txt. PC guard on every call along the board replay (verify4): 245 of the 251 reached, 65.8 million calls
+   compared, 0 differences.
+3. **Hand-written natives** (app/src/cpu/hot/banjo_hand_natives.h, hand.txt with the evidence):
+   - `culdcept_hand_idct` (sub_82353820): the same 32-bit integer arithmetic four columns, then four rows, at a time in
+     NEON lanes (SIMDe on the PC). Tested on 200,000 random blocks (sparse, dense, DC-only, values that wrap) against a
+     model of the guest instructions: identical workspace and output. PC guard (verify4, every call of the replay):
+     604,800 calls compared with the original, 0 differences. Its first run (verify3) found the one register the
+     native did not set: the original leaves the link register at 0x82353828 (its bl to the register-save routine);
+     the native sets it now.
+   - `culdcept_hand_huffman` (sub_8234DED8 with its refill and slow decode worked in): the bit reader in host registers,
+     every write held until the MCU is decoded, declined where the source runs dry, a restart is due or the original would
+     warn. Round-trip test of 44,924 random MCUs (1-10 blocks, random tables, stuffed bytes, zero runs, the end marker):
+     decoded as encoded. The guard cannot repeat it (the refill's indirect call), so `culdcept_hand_huffman_verify` runs
+     the original after it and compares: PC (huff1, the board replay), 600,000 MCUs checked, 0 differences. In the
+     guard's logged form it declines (verify3, with it running there too, reported the paths as different: the native
+     reaches no call where the original's statements reach the refill's), so the guard counts the hook as not
+     comparable (verify4: 201,600 calls, 0 differences).
+   - Not given one: the colour conversion (four table lookups a pixel; a native would make the same lookups), the free
+     and the wait above.
+   - **A hand.txt function needs a line in localized.txt.** tools/localize_native.py takes a hand.txt function out of
+     the bulk list, and places a native in front of a callee only where a caller's copy inlines it (these two are called
+     for real: the decoder's refill has an indirect call). With only hand.txt and the bulk lines, the first codegen made
+     neither native's call (no `n_<id>::Native` in app/generated/hot); both are listed in localized.txt now, as
+     Katamari's were.
