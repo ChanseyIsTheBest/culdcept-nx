@@ -13,7 +13,7 @@ and replays). Details and evidence: `docs/culdcept-notes.md`; the timeline: `doc
 | PC (Renut on Vulkan) | The same, at 60 fps; every machine copy and the IDCT native checked on every call (see "Measured") |
 | Ryujinx (Renut on deko3d, the Switch NRO) | The route to the first battle at about 60 fps; every verify line 0 differences |
 | SD card folder | `D:\culdceptsaga\sdcard\switch\culdcept-nx` (rc4 plus the extracted disc, hard links to `D:\culdceptsaga\game`); not in git, not uploaded |
-| Package | `D:\culdceptsaga\builds\2026-11-19_1717_rc4` (rc3 of 13:35 and earlier superseded); PENDING: rc5 with tonight's work |
+| Package | `D:\culdceptsaga\builds\2026-11-20_0419_rc5` (commit 3fede365; rc4 of 2026-11-19 17:17 and earlier superseded): NRO (43.0 MB), culdcept.toml (shipped), configs/ (with `renut_profile_slow.toml`, the stutter profile's, and `culdcept_shipped.toml`), DKSH cache, ELF, source snapshot, README, PACKAGE_NOTES (what changed since rc4). The SD folder refreshed with it at 04:20 |
 | Web installer | `D:\culdceptsaga\culdcept-nx-installer` (the template's copy with Culdcept's game.json and release/); not published |
 
 ## Fixes made for this game (all in culdcept-nx)
@@ -40,11 +40,13 @@ and replays). Details and evidence: `docs/culdcept-notes.md`; the timeline: `doc
 12. The board stutter (tonight; `docs/culdcept-notes.md`, the two stutter sections):
     - the profile read: ~230 frames of 40 ms or more in 4 minutes; in them 18 % file opens, ~22 % the game's JPEG
       decoder (the card art), 9 % the game's small-block free, 6.5 % a wait for its loader thread;
-    - the game's data files kept open (`filesystem_keep_open`, handoff 12): PENDING result;
+    - the game's data files kept open (`filesystem_keep_open`, handoff 12): on the PC's board replay 595 reopens in
+      300 s took a parked handle (no file-system request); the console's share: PENDING (the next profile);
     - machine copies of every function in the console profile that had none (102 -> 256), the decoder chain among them;
     - hand-written natives: the JPEG inverse DCT (`culdcept_hand_idct`, NEON lanes) and the Huffman decoder
       (`culdcept_hand_huffman`, the bit reader in registers); both bit-exact in unit tests (200,000 blocks; 44,924
-      MCUs); PENDING: the PC guard / self-check, Ryujinx, the console;
+      MCUs); on the PC the IDCT compared with the original on every call (604,800, 0 differences) and the Huffman
+      decoder by its own check (600,000 MCUs, 0 differences); PENDING: Ryujinx, the console;
     - not given a native, and why: the small-block free (its time is a list walk a native cannot shorten), the colour
       conversion (a native would make the same table lookups), the wait (time spent waiting for a file).
 
@@ -87,7 +89,8 @@ after the fix.
   The replay's profile (out/console_runs/prof1): main thread 35 % of a core (68 % peak), render thread 16 %, the process
   80 % of 400 %.
 - Machine copies: 99 before tonight, checked on the PC with every copy guarded on every call (170 M calls, 0
-  differences); PENDING: the 256.
+  differences); the 256 of tonight: 245 of the 251 bulk copies reached on the board replay, 65.8 M calls compared, 0
+  differences (verify4).
 - Frame rates on the PC and in Ryujinx are proxies only; the console decides (load times and frame rates were not
   compared between emulator runs).
 
