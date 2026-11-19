@@ -65,6 +65,10 @@ REXCVAR_DEFINE_STRING(input_script_p3, "", "Input",
                       "Test automation: as input_script, for user 2 (the third controller); its pad connects 2 s "
                       "before its first press")
     .lifecycle(rex::cvar::Lifecycle::kInitOnly);
+REXCVAR_DEFINE_STRING(input_script_p4, "", "Input",
+                      "Test automation: as input_script, for user 3 (the fourth controller); its pad connects 2 s "
+                      "before its first press")
+    .lifecycle(rex::cvar::Lifecycle::kInitOnly);
 // renut-ultimate (2026-11-10, the user's request): on by default. The Switch driver sends the game's two motors as HD
 // rumble (the heavy one on the low band at 160 Hz, the light one on the high band at 320 Hz) to the handheld Joy-Cons,
 // a Joy-Con pair, a single Joy-Con or a Pro Controller, and only when the value changes (one hid IPC then); the PC's
@@ -290,10 +294,14 @@ const std::vector<ScriptedPress>& InputScriptP3() {
   static const std::vector<ScriptedPress> presses = ParseInputScript(REXCVAR_GET(input_script_p3));
   return presses;
 }
-// User 1's or user 2's script (input_script_p2 / _p3); empty for any other user.
+const std::vector<ScriptedPress>& InputScriptP4() {
+  static const std::vector<ScriptedPress> presses = ParseInputScript(REXCVAR_GET(input_script_p4));
+  return presses;
+}
+// User 1's, 2's or 3's script (input_script_p2 / _p3 / _p4); empty for any other user.
 const std::vector<ScriptedPress>& InputScriptOther(uint32_t user_index) {
   static const std::vector<ScriptedPress> none;
-  return user_index == 1 ? InputScriptP2() : user_index == 2 ? InputScriptP3() : none;
+  return user_index == 1 ? InputScriptP2() : user_index == 2 ? InputScriptP3() : user_index == 3 ? InputScriptP4() : none;
 }
 double ScriptSeconds();
 // culdcept-nx (2026-11-19): a scripted user's pad connects 2 s before its first press (a pad switched on late).
@@ -482,11 +490,11 @@ X_RESULT InputSystem::GetState(uint32_t user_index, X_INPUT_STATE* out_state) {
     }
     return X_ERROR_SUCCESS;
   }
-  if ((user_index == 1 || user_index == 2) && !InputScriptOther(user_index).empty()) {  // culdcept-nx: _p2, _p3
+  if (user_index >= 1 && user_index <= 3 && !InputScriptOther(user_index).empty()) {  // culdcept-nx: _p2-_p4
     if (!ScriptOtherConnected(user_index)) return X_ERROR_DEVICE_NOT_CONNECTED;
     const uint16_t buttons = ScriptedButtons(InputScriptOther(user_index));
-    static uint32_t packets[3] = {1, 1, 1};
-    static uint16_t lasts[3] = {};
+    static uint32_t packets[4] = {1, 1, 1, 1};
+    static uint16_t lasts[4] = {};
     if (buttons != lasts[user_index]) {
       lasts[user_index] = buttons;
       ++packets[user_index];
@@ -495,7 +503,7 @@ X_RESULT InputSystem::GetState(uint32_t user_index, X_INPUT_STATE* out_state) {
       std::memset(out_state, 0, sizeof(*out_state));
       out_state->packet_number = packets[user_index];
       out_state->gamepad.buttons = buttons;
-      static bool was_pushed[3] = {};
+      static bool was_pushed[4] = {};
       const bool pushed = ScriptedStickPushes(out_state->gamepad, InputScriptOther(user_index));
       if (pushed || was_pushed[user_index]) out_state->packet_number = ++packets[user_index];
       was_pushed[user_index] = pushed;
