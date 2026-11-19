@@ -165,12 +165,9 @@ banjo_deko3d_eager_kicks = true
 # 50216CC1, from data\shader.fx) into one target, then copies it to the front buffer: no composite before the HUD for
 # banjo_renut_smaa_after_ps to name (the battle's draw log on the PC and in Ryujinx, out/pc_runs/runA, emu_runs/rdcemu1).
 banjo_renut_smaa = false
-# culdcept-nx (2026-11-19): the fast draw off (A/B 25, deko3d only). With it on, in 2 of 2 Ryujinx runs that reached the
-# board (emu9, emu11) the map's 2D panels (the dialogue box, the battle HUD, the village sign) were drawn with other
-# textures (a red tile's, or nothing) from the map's load on; in the 2 runs where the draw log had switched it off
-# (FastMiss(kFastDiag): rdcemu1, emu10) and on the PC (no fast draw on Vulkan) every panel was right
-# (docs/culdcept-notes.md, "Missing 2D panels"). The full DrawStateLocked for every draw: the same pixels.
-banjo_renut_fast_draw = false
+# culdcept-nx (2026-11-19): the fast draw (A/B 25, deko3d) on, as the base ships it. It had drawn the board's 2D panels
+# with the draw before's vertex layout (the device's own SetFVF declaration rewritten in place, which no kFieldDecl
+# marked); fixed in render/draw.h's FieldOfOffset (docs/culdcept-notes.md, "Missing 2D panels").
 banjo_renut_fur_shells_percent = 75
 banjo_renut_portrait_fur_shells_percent = 50
 banjo_renut_portrait_msaa_samples = 2

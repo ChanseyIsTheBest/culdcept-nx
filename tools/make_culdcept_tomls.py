@@ -46,9 +46,6 @@ SHIPPED = {
     # No composite before the HUD to run SMAA after: the board and the HUD share one shader pair and one target
     # (docs/culdcept-notes.md, "SMAA"). Off; the picture is the game's own.
     'banjo_renut_smaa': 'false',
-    # The fast draw (A/B 25, deko3d) kept the map's 2D panels' old textures in Ryujinx (2 of 2 runs with it, 0 of 2
-    # without): off (docs/culdcept-notes.md, "Missing 2D panels").
-    'banjo_renut_fast_draw': 'false',
     # Decided from this port's own log (out/pc_runs/cg13_1, 89 windows: the story and the first board battle): no draw
     # replayed from a recorded command buffer, the inert draw skip 0 in every window.
     'ultimate_renut_replay_inherit_same': 'false',
@@ -62,8 +59,7 @@ PLAY = {'log_level': '"off"', 'banjo_renut_diag_resolve_trace': 'false', 'banjo_
 # Culdcept Saga draws its frames with direct calls (no recorded command buffer: the recorder is not linked, 0 replays in
 # the PC logs): the fast draw (25), pipelines by content (28), whole-buffer copies (22), the setters' touch compare (26),
 # mesh objects (42); 1 (a Vulkan-only key) is the do-nothing control on the Switch. 6 targets x 60 s = 6 minutes a round.
-# culdcept-nx (2026-11-19): 25 (the fast draw) taken out: it is off here, so its halves would be the same.
-AB = {'banjo_renut_ab_targets': '"28,22,26,42,1"', 'banjo_renut_ab_s': '30', 'banjo_renut_dynamic_resolution': 'false'}
+AB = {'banjo_renut_ab_targets': '"25,28,22,26,42,1"', 'banjo_renut_ab_s': '30', 'banjo_renut_dynamic_resolution': 'false'}
 VERIFY = {k: 'true' for k in (
     'banjo_renut_fast_draw_verify', 'banjo_renut_resource_objects_verify', 'banjo_renut_fetch_cache_verify',
     'banjo_renut_whole_buffers_verify', 'banjo_renut_persistent_shared_verify', 'banjo_renut_chain_reuse_verify',

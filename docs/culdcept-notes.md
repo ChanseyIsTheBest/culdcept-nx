@@ -282,7 +282,7 @@ put sound in **FL and FR only** in every window (C, LFE, RL and RR 0 frames in a
 configuration says, so the port's 5.1-to-stereo fold has nothing to fold. `audio_speaker_config = 1`: see below.
 `audio_switch_pump_pairs` is the user's choice (off as the base ships it).
 
-## Missing 2D panels on the board in Ryujinx (2026-11-19): the fast draw, off
+## Missing 2D panels on the board in Ryujinx (2026-11-19): the fast draw's declaration, fixed
 
 - **What**: in emu9 (the full route, 840 s, the build with the callback fix), from the map's load (452 s) on, the map's
   2D panels were wrong: the "Santana Village" sign drawn as a translucent red rectangle, Faustina's dialogue box and its
@@ -333,6 +333,27 @@ FL and FR only in every window. The game's mix does not depend on the configurat
   stale would draw a panel untextured: a coloured translucent box, as seen). **Shipped: the fast draw off**, the
   picture right in 3 of 3 runs; its cost is the render thread's (a proxy: about 15-16 ms a frame in Ryujinx, the
   story's scenes under 60 fps there; the console decides).
+- **Found (2026-11-19 09:30, the user's request to fix the fast draw)**: a diagnostic key,
+  `banjo_renut_diag_fast_force` (`from-to:mask;...`, seconds after the first fast-draw check: field bits every fast
+  draw takes as changed in that window, logged as `[fastforce]`), bisected the kept state in one run each:
+  - emu16: every field forced: the dialogue boxes back; none: missing; the textures (22001), the bools (2), the view
+    packets (3C): missing; the rest (1DFC0): the battle HUD back.
+  - emu17, one bit a window in the battle: **`kFieldDecl` (100)**: the HUD back in both captures; `kFieldShaders`
+    (8000), which recomputes the declaration too: back once; every other bit: missing.
+  - The cause: the game draws its 2D panels with an FVF (SetFVF), and Direct3D builds that vertex declaration inside
+    the device (`kDeviceDeclarationOffset` 0x2E90 here, its elements from +52) and points the declaration word
+    (0x2D10) at it. A new FVF rewrites the declaration in place; the word keeps its address, so no `kFieldDecl`, and
+    the fast path (which looks at the declaration again only on `kFieldDecl` or a shader change) kept the draw
+    before's vertex layout: the panels' quads read with another layout. The full path (`DrawStateLocked`) reads the
+    declaration at every draw. The device's own declaration's bytes mapped to `kFieldTail`.
+  - **Fix**: `FieldOfOffset` (render/draw.h) counts those bytes (0x2E90 + 52 + 15 x 12) as `kFieldDecl` too, with a
+    static_assert against `kDeviceDeclarationOffset`. Handoff `07_fast_draw_device_declaration.patch` (the base's
+    offset 0x2F98).
+  - **Confirmed**: emu19 (the fast draw on, 100 % fast, nothing forced): every panel right through the route (the
+    dialogue boxes, the card panel, "Drew 1 card", the battle HUD), no stall; the render thread about 7-10 ms a frame
+    there (a proxy; 15-16 ms with the fast draw off). (emu18 does not count: started while another session compiled,
+    its boot ran at 0.5-17 fps and the timed route ended on the title screen.) The fast draw is on again, built in and
+    shipped; A/B 25 back in `renut_ab.toml`.
 
 ## Hot functions: the machine copies (2026-11-19)
 

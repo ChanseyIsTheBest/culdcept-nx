@@ -1,4 +1,4 @@
-# culdcept-nx: the session's report (2026-11-18 23:45 to 2026-11-19 12:00 AEST)
+# culdcept-nx: the session's report (2026-11-18 23:45 to 2026-11-20 12:00 AEST: the deadline extended by 24 hours)
 
 Culdcept Saga (Xbox 360, title 424107DD, XDK 2.0.3424) ported with ReXGlue from renut_nx_ultimate_base 5017fe95, on
 the PC and in Ryujinx only (no console, nothing on its SD card). Details and evidence: `docs/culdcept-notes.md`; the
@@ -24,8 +24,9 @@ timeline: `docs/progress-log.md`; console steps: `docs/console-testing.md`.
 4. The models' alpha test at the console's 8-bit precision (handoff 03, off by default for the base).
 5. A movie skip hung the game in Ryujinx (3 of 3 runs at the 144 s press): Renut ran GPU callbacks only in its own D3D
    hooks; they now run when a game thread waits or sleeps (`banjo_renut_callbacks_at_waits`, handoff 05).
-6. The board's 2D panels drawn with stale textures in Ryujinx (2 of 2 runs with Renut's fast draw, 0 of 3 without):
-   `banjo_renut_fast_draw = false` (handoff note).
+6. The board's 2D panels (dialogue box, battle HUD, a sign) drawn wrong in Ryujinx with Renut's fast draw: the game's
+   SetFVF declaration is rewritten in place inside the device and the fast draw kept the old vertex layout (found
+   with a field-forcing bisection: `kFieldDecl`). Fixed in the field map (handoff 07); the fast draw stays on.
 7. SMAA off (no composite to anchor it: the board and the HUD share one shader and one target).
 
 ## Measured, and how
@@ -39,8 +40,9 @@ timeline: `docs/progress-log.md`; console steps: `docs/console-testing.md`.
   `audio_speaker_config = 1`: the game mixes stereo; the default stays.
 - Machine copies: 99 (Ryujinx and PC profiles), checked on the PC with every copy guarded on every call to the battle
   (170 M calls, 0 differences) and with poisoned dead registers (0 differences); in place on the Switch.
-- Frame rates: PC and Ryujinx both 60 fps (the vsync cap) in every scene of the route; proxies only, not compared
-  between emulator runs; the console decides.
+- Frame rates (proxies; the console decides; not compared between emulator runs): the PC holds 60 fps through the
+  route; Ryujinx with the shipped settings about 60 fps on the board and in the battle (render thread about 7-10 ms
+  a frame in emu19).
 
 ## What is next (the console steps: `docs/console-testing.md`)
 

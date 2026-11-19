@@ -323,6 +323,12 @@ REXCVAR_DEFINE_BOOL(banjo_renut_fast_draw, true, "Banjo/Enhancements",
                     "predication, Draw*UP, points, tessellation, memexport, the fur, the composite and range geometry "
                     "keep DrawStateLocked. A/B target 25. Off: DrawStateLocked for every draw")
     .lifecycle(rex::cvar::Lifecycle::kInitOnly);
+// culdcept-nx (2026-11-19): see FastForceFields.
+REXCVAR_DEFINE_STRING(banjo_renut_diag_fast_force, "", "Banjo/Renut",
+                      "Diagnostic: 'from-to:mask;...' (seconds after the first fast-draw check, a hexadecimal DrawField "
+                      "mask): in each window every fast draw takes those field bits as changed, whatever its chain "
+                      "says; each window's start is logged ([fastforce]). Empty: off")
+    .lifecycle(rex::cvar::Lifecycle::kInitOnly);
 // banjo-nx (2026-10-27): the shadow-path census (draw.h DrawKindsReport).
 REXCVAR_DEFINE_BOOL(banjo_renut_diag_draw_kinds, false, "Banjo/Diagnostics",
                     "Renut's renderer (2026-10-27): the replayed draws by kind (shadow maps: a depth target and no pixel "
@@ -9432,6 +9438,11 @@ VertexDeclarationRecord &NoDeclaration() {
 constexpr u32 kDeviceDeclarationOffset = 0x2E90;  // culdcept-nx: sub_82182688 `stw r?,11920(r31)`
 constexpr u32 kDeclarationElementsOffset = 52;
 constexpr u32 kDeviceDeclarationMaxElements = 15;
+// culdcept-nx (2026-11-19): draw.h's field map counts these bytes as the declaration (FieldOfOffset).
+static_assert(kDeviceOwnDeclarationBegin == kDeviceDeclarationOffset &&
+              kDeviceOwnDeclarationEnd == kDeviceDeclarationOffset + kDeclarationElementsOffset +
+                                              kDeviceDeclarationMaxElements * 12 &&
+              kDeviceOwnDeclarationEnd <= d3d::kDeviceSnapshotSize);
 
 const VertexDeclarationRecord *DeviceDeclarationLocked(const GuestDevice &device) {
   static std::unordered_map<uint64_t, std::unique_ptr<VertexDeclarationRecord>> records;
@@ -10567,6 +10578,53 @@ uint64_t g_fast_pipeline_hits = 0, g_fast_pipeline_misses = 0;  // the 10 s line
 // from before an invalidation (generation).
 uint64_t g_fast_pipeline_miss_why[4] = {};
 uint64_t g_fast_draws = 0, g_full_draws = 0, g_fast_why[16] = {};  // the 10 s line's
+// culdcept-nx (2026-11-19, the board's stale 2D panels with the fast draw): banjo_renut_diag_fast_force's windows, the
+// field bits every fast draw takes as changed in each (a bisection of the fast draw's kept state in one run).
+u32 FastForceFields() {
+  struct Window {
+    double from, to;
+    u32 mask;
+  };
+  static const std::vector<Window> windows = [] {
+    std::vector<Window> w;
+    const std::string spec = REXCVAR_GET(banjo_renut_diag_fast_force);
+    size_t at = 0;
+    while (at < spec.size()) {
+      size_t end = spec.find(';', at);
+      if (end == std::string::npos)
+        end = spec.size();
+      const std::string item = spec.substr(at, end - at);
+      at = end + 1;
+      const size_t dash = item.find('-'), colon = item.find(':');
+      if (dash == std::string::npos || colon == std::string::npos || colon < dash)
+        continue;
+      Window x;
+      x.from = std::strtod(item.substr(0, dash).c_str(), nullptr);
+      x.to = std::strtod(item.substr(dash + 1, colon - dash - 1).c_str(), nullptr);
+      x.mask = u32(std::strtoul(item.substr(colon + 1).c_str(), nullptr, 16));
+      w.push_back(x);
+    }
+    return w;
+  }();
+  if (windows.empty())
+    return 0;
+  static const auto start = std::chrono::steady_clock::now();
+  const double t = std::chrono::duration<double>(std::chrono::steady_clock::now() - start).count();
+  int index = -1;
+  u32 mask = 0;
+  for (size_t i = 0; i < windows.size(); ++i)
+    if (t >= windows[i].from && t < windows[i].to) {
+      index = int(i);
+      mask = windows[i].mask;
+      break;
+    }
+  static int last = -2;
+  if (index != last) {
+    last = index;
+    RGPU_INFO("[fastforce] {:.1f} s after the first fast-draw check: window {} forces the fields {:05X}", t, index, mask);
+  }
+  return mask;
+}
 
 // The reasons a draw went to DrawStateLocked, by the first met (the 10 s line).
 enum FastWhy : u32 {
@@ -10874,7 +10932,7 @@ int FastDrawLocked(const u8 *device_state, const DrawCall &call, const ReplayCon
   const bool point = call.primitive == kPointList;
   if (call.tessellation || (point && !PointFastDrawOn()))
     return FastMiss(kFastCall);
-  const u32 fields = chain.fields;
+  const u32 fields = chain.fields | FastForceFields();  // culdcept-nx: banjo_renut_diag_fast_force
   // banjo-nx (2026-10-28, per-draw night): the predication is one of the viewport's inputs below (the viewport is all
   // that reads it); A/B 61's off half sends the draw the full way as before.
   if ((fields & kFieldPredication) && ab == 61)

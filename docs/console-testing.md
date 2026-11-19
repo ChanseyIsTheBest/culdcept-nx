@@ -22,14 +22,16 @@ Keep `sdmc:/switch/culdcept-nx/logs/` afterwards. What to look for in `renut_001
 - `[enhancements]`: the line of what is on.
 - `[renut] frame pacing` every 10 s: the console's frame rate and 1 % lows (the numbers that count; the PC's and
   Ryujinx's are proxies only).
-- `[stall]` / `[hitch]`: where every thread was during a stop of 1 s or more (Ryujinx stopped presenting once, 25 s
-  in, after the intro movie, in 1 of 3 runs: not seen again; if the console does it, these lines say where).
+- `[stall]` / `[hitch]`: where every thread was during a stop of 1 s or more (Ryujinx stopped for good at a movie's
+  start or skip until the GPU-callback fix, `banjo_renut_callbacks_at_waits`; if the console stops, these lines say
+  where).
 - `[renut] SMAA`: frames with SMAA (see the notes' "SMAA").
 - `[audio]`: the stream's under-runs, if any.
 
 Look at the board's 2D panels (the dialogue box under a portrait, the battle's Cepter / Creature Card panels,
-"Spell Selection"): in Ryujinx they went missing or showed another texture (red rectangles) with Renut's fast draw on;
-every toml here has it off (`banjo_renut_fast_draw = false`). If they still go wrong on the console, copy
+"Spell Selection"): in Ryujinx they went missing or showed another texture (red rectangles) until the fast draw's
+declaration fix in this build. If they go wrong on the console, first try `banjo_renut_fast_draw = false` in
+`culdcept.toml` (the full draw path), then copy
 `configs/renut_textures_plain.toml` over `culdcept.toml` and play the same part again; say whether they come back
 (docs/culdcept-notes.md, "Missing 2D panels").
 

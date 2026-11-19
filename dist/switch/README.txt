@@ -44,9 +44,9 @@ renut_pgo.toml    the shipped settings with no log, no profiler and no diagnosti
 renut_720_docked.toml  720 lines docked too, the Xbox 360's own (pixel-identical to the console).
 renut_msaa2.toml  MSAA 2x (changes the picture: your decision).
 renut_dynamic.toml dynamic resolution, 540-720 handheld / 720-1080 docked (not pixel-identical: your decision).
-renut_textures_plain.toml  two more texture shortcuts off (the deko3d bind skip and the fetch-only memo): try it if
-                  the board's 2D panels (dialogue box, HUD) still go missing or show another texture. (Their cause in
-                  Ryujinx was Renut's fast draw, which every toml here has off: banjo_renut_fast_draw = false.)
+renut_textures_plain.toml  two texture shortcuts off (the deko3d bind skip and the fetch-only memo): a further trial
+                  if the board's 2D panels (dialogue box, HUD) ever go missing or show another texture. (Their cause in
+                  Ryujinx, Renut's fast draw keeping the draw before's vertex layout, is fixed in this build.)
 
 Cores
 -----
