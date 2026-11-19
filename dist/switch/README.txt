@@ -70,4 +70,7 @@ What this port changes for the game (all exact unless said)
 - The game compiles two of its seven shaders at run time from data\shader.fx with D3DX; both shader formats it uses
   (version 0x10 from that compiler, 0x11 from its data) are translated.
 - Alpha test at the console's 8-bit precision (the models' "alpha >= 1.0" test against interpolated white).
+- The Xbox 360 keyboard is the Switch's own (the system keyboard applet); B in it cancels, as on the 360. The game's
+  system message boxes (for example "This Cepter's name will be ...") take the button the game focused, without being
+  shown (switch_message_box_focused = false shows the SDK's own box, which the console never drew).
 - Everything else is the base's renderer and CPU work, listed in the log's "[enhancements]" line.

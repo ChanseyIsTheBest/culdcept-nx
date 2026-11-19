@@ -29,6 +29,10 @@ timeline: `docs/progress-log.md`; console steps: `docs/console-testing.md`.
    SetFVF declaration is rewritten in place inside the device and the fast draw kept the old vertex layout (found
    with a field-forcing bisection: `kFieldDecl`). Fixed in the field map (handoff 07); the fast draw stays on.
 7. SMAA off (no composite to anchor it: the board and the HUD share one shader and one target).
+8. The Cepter name on the console (the user's tests): B in the keyboard now cancels (the keyboard's overlapped
+   completes with ERROR_CANCELLED, `xam_keyboard_cancel_result`), and the game's "This Cepter's name will be ..."
+   system message box, which the SDK's ImGui box never showed on the console (the game froze waiting), takes the
+   button the game focused (`switch_message_box_focused`, logged). Confirmed by the user on the console.
 
 ## Handoffs for the base (`D:\culdceptsaga\out\handoff`, README.md there; against 5017fe95, all eight apply together)
 
@@ -80,4 +84,7 @@ constants, the installer's Katamari-only test, CG-13's census naming a copy's ca
 - Decided (yours, 2026-11-19): the profiler stays on, its stack sampler (`switch_profile_stacks`) off in the shipped
   toml and every config but `configs/renut_profile.toml` (once in Ryujinx the app stopped inside the profiler's start
   with it on: 1 run of about 20).
+- System message boxes on the Switch are answered with the game's focused button and not shown (the name's "Yes"); a
+  native Yes / No is a follow-up if any box should be answered otherwise (each is logged).
+- The CPU clock stays as the console sets it (your word).
 - No title update or DLC was needed.

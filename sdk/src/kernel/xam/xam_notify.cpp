@@ -16,6 +16,9 @@
 #include <rex/system/kernel_state.h>
 #include <rex/system/xnotifylistener.h>
 #include <rex/system/xtypes.h>
+#include <rex/cvar.h>
+
+REXCVAR_DECLARE(bool, xam_keyboard_trace);  // xam_ui.cpp (culdcept-nx, diagnostic)
 
 namespace rex {
 namespace kernel {
@@ -88,6 +91,9 @@ u32 XNotifyGetNext_entry(u32 handle, u32 match_id, mapped_u32 id_ptr, mapped_u32
     *param_ptr = dequeued ? param : 0;
   }
 
+  if (dequeued && id == 0x9 && REXCVAR_GET(xam_keyboard_trace)) {
+    REXKRNL_INFO("[kbtrace] XNotifyGetNext({:08X}): XN_SYS_UI {}", uint32_t(handle), param);
+  }
   if (dequeued) {
     REXKRNL_NOISY_DEBUG("XNotifyGetNext({:08X}, {:08X}) -> id={:#x}, param={}", uint32_t(handle),
                         uint32_t(match_id), id, param);

@@ -27,6 +27,26 @@ REXCVAR_DEFINE_STRING(headless_keyboard_text, "", "Kernel",
 REXCVAR_DEFINE_BOOL(switch_software_keyboard, true, "Kernel",
                     "Switch: the game's on-screen keyboard is the system's software keyboard applet. false = the "
                     "ImGui text box (no keys to type with on the console)");
+// culdcept-nx (2026-11-19, a keyboard that came back after every cancel on the console): Culdcept Saga reads a
+// cancel as XGetOverlappedResult returning ERROR_CANCELLED (its keyboard object, sub_822AFF18: 1223 -> "cancelled",
+// 0 -> read the buffer). With the result ERROR_SUCCESS and only the extended error ERROR_CANCELLED (Xenia's), it read
+// the cleared buffer as a name the player gave, so the name screen asked again, and the player could not leave it.
+REXCVAR_DEFINE_BOOL(xam_keyboard_cancel_result, true, "Kernel",
+                    "A cancelled keyboard (XamShowKeyboardUI) completes its overlapped with ERROR_CANCELLED as the "
+                    "result as well as the extended error, as the console does. false: the result ERROR_SUCCESS with "
+                    "the extended error only (as before)");
+// culdcept-nx (2026-11-19, the name screen frozen on the console): Culdcept Saga asks "is this name OK?" with
+// XShowMessageBoxUI. The SDK's ImGui dialog for it was never seen on the console (its overlapped never completed: the
+// game held XN_SYS_UI on and took no input), so on the Switch a message box takes the button the game focused, as with
+// headless (the route runs' answer: the creation, the save, the story and the battle went through), and is logged.
+REXCVAR_DEFINE_BOOL(switch_message_box_focused, true, "Kernel",
+                    "Switch: a system message box (XamShowMessageBoxUI) is answered at once with the button the game "
+                    "focused, as with headless, and logged. false = the SDK's ImGui dialog (never shown on the console)");
+// culdcept-nx (2026-11-19, diagnostic: the name screen that never took the Switch keyboard's name in Ryujinx).
+REXCVAR_DEFINE_BOOL(xam_keyboard_trace, false, "Kernel",
+                    "Diagnostic: the Switch keyboard's dispatch logged (XN_SYS_UI broadcasts, the result written), and "
+                    "for 10 s after it closes the overlapped's words and the 96 bytes before and after it, as they "
+                    "change (Culdcept Saga's keyboard object holds the overlapped at +32)");
 REXCVAR_DEFINE_DOUBLE(switch_software_keyboard_test, 0.0, "Kernel",
                       "Test: this many seconds after the game first reads a controller, open the keyboard once as "
                       "the game does (XamShowKeyboardUI with an overlapped) and log the result. 0 = off");
@@ -44,6 +64,9 @@ REXCVAR_DEFINE_DOUBLE(switch_software_keyboard_test, 0.0, "Kernel",
 
 #include <algorithm>
 #include <chrono>
+#include <cstdio>
+#include <iterator>
+#include <thread>  // std::this_thread::sleep_for (the keyboard watch)
 
 namespace rex {
 namespace kernel {
@@ -198,14 +221,20 @@ X_RESULT xeXamDispatchHeadless(std::function<X_RESULT()> run_callback, uint32_t 
 
 X_RESULT xeXamDispatchHeadlessEx(std::function<X_RESULT(uint32_t&, uint32_t&)> run_callback,
                                  uint32_t overlapped) {
-  auto pre = []() {
+  auto pre = [overlapped]() {
+    if (REXCVAR_GET(xam_keyboard_trace)) {
+      REXKRNL_INFO("[kbtrace] dispatch of overlapped {:08X}: XN_SYS_UI on", overlapped);
+    }
     // Broadcast XN_SYS_UI = true
     REX_KERNEL_STATE()->BroadcastNotification(0x9, true);
   };
-  auto post = []() {
+  auto post = [overlapped]() {
     rex::thread::Sleep(std::chrono::milliseconds(100));
     // Broadcast XN_SYS_UI = false
     REX_KERNEL_STATE()->BroadcastNotification(0x9, false);
+    if (REXCVAR_GET(xam_keyboard_trace)) {
+      REXKRNL_INFO("[kbtrace] dispatch of overlapped {:08X}: XN_SYS_UI off", overlapped);
+    }
   };
   if (!overlapped) {
     pre();
@@ -309,11 +338,30 @@ u32 XamShowMessageBoxUI_entry(u32 user_index, mapped_wstring title_ptr, mapped_w
     buttons.push_back(rex::string::to_utf8(button));
   }
 
+  // culdcept-nx (2026-11-19): every message box logged (the game's question, its buttons, the answer).
+  {
+    std::string listed;
+    for (size_t i = 0; i < buttons.size(); ++i) {
+      listed += (i ? " | " : "") + buttons[i];
+    }
+    REXKRNL_INFO("XamShowMessageBoxUI: \"{}\": \"{}\" [{}], focused button {}", title, text_str, listed,
+                 uint32_t(active_button));
+  }
+
   X_RESULT result;
-  if (REXCVAR_GET(headless)) {
+  bool answer_focused = REXCVAR_GET(headless);
+#if REX_PLATFORM_SWITCH
+  answer_focused = answer_focused || REXCVAR_GET(switch_message_box_focused);
+#endif
+  if (answer_focused) {
     // Auto-pick the focused button.
-    auto run = [result_ptr, active_button]() -> X_RESULT {
-      *result_ptr = static_cast<uint32_t>(active_button);
+    const uint32_t answer = uint32_t(active_button) < button_count ? uint32_t(active_button) : 0;
+    if (!REXCVAR_GET(headless)) {
+      REXKRNL_INFO("XamShowMessageBoxUI: answered with the focused button {} (\"{}\") (switch_message_box_focused)",
+                   answer, answer < buttons.size() ? buttons[answer] : std::string());
+    }
+    auto run = [result_ptr, answer]() -> X_RESULT {
+      *result_ptr = answer;
       return X_ERROR_SUCCESS;
     };
     result = xeXamDispatchHeadless(run, overlapped.guest_address());
@@ -461,6 +509,79 @@ std::u16string ReadGuestWString(const char16_t* host, size_t max_chars) {
 constexpr uint32_t kSwitchKeyboardMaxChars = 500;
 constexpr size_t kPromptMaxChars = 512;
 
+// culdcept-nx (2026-11-19, xam_keyboard_trace): the overlapped's words and the game's words around it (Culdcept Saga's
+// keyboard object: +16 its state, +18 its result, +24 its shown flag, +32 the overlapped, +84 the call's return), every
+// 50 ms for 10 s, logged when they change. Runs on the kernel's dispatch thread after the overlapped is completed (a
+// std::thread made there ended the program on the console: std::terminate in its constructor).
+void WatchKeyboard(uint32_t overlapped_guest) {
+  {
+    const uint32_t first = overlapped_guest - 32;
+    constexpr uint32_t kWords = 32;  // 128 bytes: the object's first 96 and the overlapped's 28
+    uint32_t last[kWords];
+    std::fill(std::begin(last), std::end(last), 0xFFFFFFFFu);
+    std::string last_names;
+    for (int tick = 0; tick < 200; ++tick) {
+      bool changed = false;
+      for (uint32_t i = 0; i < kWords; ++i) {
+        const uint32_t v =
+            rex::memory::load_and_swap<uint32_t>(REX_KERNEL_MEMORY()->TranslateVirtual(first + i * 4));
+        changed |= v != last[i];
+        last[i] = v;
+      }
+      // Culdcept Saga's own (sub_822B4538 / sub_822AFF18 / sub_822B8618): the object's +72 is the game's text buffer at
+      // base + 0x14899; the converted name goes to base + 0x149C5, the name screen's result byte is base + 0x14F7B.
+      const uint32_t buffer_guest = last[72 / 4];  // the words start at the object (the overlapped at +32)
+      std::string names;
+      // The object's +8 (its owner: the name screen's task, sub_822B8618, whose +40 is its step and +44 its kind),
+      // 16 words of it.
+      const uint32_t owner = last[8 / 4];
+      if (owner >= 0x40000000u && owner < 0xF0000000u) {
+        names += "owner";
+        for (uint32_t i = 0; i < 16; ++i) {
+          char w[12];
+          std::snprintf(w, sizeof(w), " %08X",
+                        rex::memory::load_and_swap<uint32_t>(REX_KERNEL_MEMORY()->TranslateVirtual(owner + i * 4)));
+          names += w;
+        }
+        names += " | ";
+      }
+      uint32_t result_byte = 0xFFFFFFFFu;
+      if (buffer_guest >= 0x14899 && buffer_guest < 0xF0000000u) {
+        const uint32_t game = buffer_guest - 0x14899;
+        std::u16string typed;
+        for (uint32_t i = 0; i < 10; ++i) {
+          const uint16_t c =
+              rex::memory::load_and_swap<uint16_t>(REX_KERNEL_MEMORY()->TranslateVirtual(buffer_guest + i * 2));
+          if (!c) break;
+          typed.push_back(char16_t(c));
+        }
+        std::string stored;
+        for (uint32_t i = 0; i < 32; ++i) {
+          const uint8_t c = *REX_KERNEL_MEMORY()->TranslateVirtual(game + 0x149C5 + i);
+          if (!c) break;
+          stored.push_back(c >= 0x20 && c < 0x7F ? char(c) : '?');
+        }
+        result_byte = *REX_KERNEL_MEMORY()->TranslateVirtual(game + 0x14F7B);
+        names += "buffer \"" + rex::string::to_utf8(typed) + "\", name \"" + stored + "\", result " +
+                std::to_string(result_byte);
+      }
+      if (names != last_names) {
+        changed = true;
+        last_names = names;
+      }
+      if (changed) {
+        char line[kWords * 9 + 8];
+        size_t at = 0;
+        for (uint32_t i = 0; i < kWords; ++i) {
+          at += std::snprintf(line + at, sizeof(line) - at, "%08X%s", last[i], i % 8 == 7 ? "|" : " ");
+        }
+        REXKRNL_INFO("[kbtrace] +{} ms, {:08X}: {} {}", tick * 50, first, line, names);
+      }
+      std::this_thread::sleep_for(std::chrono::milliseconds(50));
+    }
+  }
+}
+
 }  // namespace
 
 // The Switch's software keyboard for XamShowKeyboardUI (switch_software_keyboard). Everything is read from the guest
@@ -487,22 +608,45 @@ constexpr size_t kPromptMaxChars = 512;
                uint32_t(user_index), flags_value, uint32_t(buffer_length), rex::string::to_utf8(title_text));
   char16_t* const out = buffer.host_address();
   const uint32_t out_count = buffer_length;
+  const uint32_t overlapped_guest = overlapped.guest_address();
   auto run = [=](uint32_t& extended_error, uint32_t& length) -> X_RESULT {
     std::u16string text;
     ++xam_dialogs_shown_;
     const SwitchKeyboardResult result =
         ShowSwitchKeyboard(title_text, description_text, default_value, flags_value, max_chars, text);
     --xam_dialogs_shown_;
+    if (REXCVAR_GET(xam_keyboard_trace)) {
+      REXKRNL_INFO("[kbtrace] keyboard closed: {} (\"{}\"), the overlapped {:08X}",
+                   result == SwitchKeyboardResult::kAccepted    ? "accepted"
+                   : result == SwitchKeyboardResult::kCancelled ? "cancelled"
+                                                                : "unavailable",
+                   rex::string::to_utf8(text), overlapped_guest);
+    }
     length = 0;
     if (result == SwitchKeyboardResult::kCancelled) {
       extended_error = X_ERROR_CANCELLED;
-      return X_ERROR_SUCCESS;
+      return REXCVAR_GET(xam_keyboard_cancel_result) ? X_ERROR_CANCELLED : X_ERROR_SUCCESS;
     }
     rex::string::copy_and_swap_truncating(
         out, result == SwitchKeyboardResult::kAccepted ? text : default_value, out_count);
     extended_error = X_ERROR_SUCCESS;
     return X_ERROR_SUCCESS;
   };
+  if (REXCVAR_GET(xam_keyboard_trace) && overlapped_guest >= 32) {
+    // As xeXamDispatchHeadlessEx, with the watch after the XN_SYS_UI off broadcast.
+    auto pre = [overlapped_guest]() {
+      REXKRNL_INFO("[kbtrace] dispatch of overlapped {:08X}: XN_SYS_UI on", overlapped_guest);
+      REX_KERNEL_STATE()->BroadcastNotification(0x9, true);
+    };
+    auto post = [overlapped_guest]() {
+      rex::thread::Sleep(std::chrono::milliseconds(100));
+      REX_KERNEL_STATE()->BroadcastNotification(0x9, false);
+      REXKRNL_INFO("[kbtrace] dispatch of overlapped {:08X}: XN_SYS_UI off; watching", overlapped_guest);
+      WatchKeyboard(overlapped_guest);
+    };
+    REX_KERNEL_STATE()->CompleteOverlappedDeferredEx(run, overlapped_guest, pre, post);
+    return X_ERROR_IO_PENDING;
+  }
   return xeXamDispatchHeadlessEx(run, overlapped.guest_address());
 }
 
@@ -621,7 +765,7 @@ u32 XamShowKeyboardUI_entry(u32 user_index, u32 flags, mapped_wstring default_te
       if (dialog->cancelled()) {
         extended_error = X_ERROR_CANCELLED;
         length = 0;
-        return X_ERROR_SUCCESS;
+        return REXCVAR_GET(xam_keyboard_cancel_result) ? X_ERROR_CANCELLED : X_ERROR_SUCCESS;
       } else {
         // Zero the output buffer.
         auto text = rex::string::to_utf16(dialog->text());

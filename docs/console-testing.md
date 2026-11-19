@@ -37,6 +37,11 @@ Keep `sdmc:/switch/culdcept-nx/logs/` afterwards. What to look for in `renut_001
   `culdcept.toml` has the sampler off since 2026-11-19 (your decision: the profiler stays on, its stack sampler off);
   only `configs/renut_profile.toml` turns it on. If it shows with the shipped toml all the same, start again and say so.
 
+System message boxes (the game's XShowMessageBoxUI: "This Cepter's name will be ...", Yes / No) are answered at once
+with the button the game focused (`switch_message_box_focused`, the SDK's ImGui box was never shown on the console);
+each one is in the log as `XamShowMessageBoxUI: "<title>": "<text>" [buttons], focused button N`. If one of them
+should have been answered the other way, say which (the log line names it).
+
 Look at the board's 2D panels (the dialogue box under a portrait, the battle's Cepter / Creature Card panels,
 "Spell Selection"): in Ryujinx they went missing or showed another texture (red rectangles) until the fast draw's
 declaration fix in this build. If they go wrong on the console, first try `banjo_renut_fast_draw = false` in

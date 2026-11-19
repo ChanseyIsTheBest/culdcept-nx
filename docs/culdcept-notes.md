@@ -418,3 +418,60 @@ FL and FR only in every window. The game's mix does not depend on the configurat
   "Stack sampling: disabled (1 ms)" with its windows written, 15 frame-pacing windows (about 58 fps once past the
   logos), no `[stall]` line, every verify line 0 differences.
 - emu24 (the shipped toml unchanged): the D3D device, focus, the game's audio, frames: the shipped settings boot.
+
+## The Cepter name on the console (2026-11-19 afternoon, the user's console tests)
+
+- **Symptom** (the user, package rc3): naming the Cepter looped (the keyboard came back after it closed), then the
+  name never showed in the field and the cursor froze. Ryujinx with the Switch keyboard (`RYUJINX_SWKBD_AUTO`, the
+  local Ryubing's test patch; kbA) showed the freeze too; the earlier route runs never met it: `headless` answered
+  every system UI at once.
+- **The game's code**: the name task `sub_822B8618` (step at +40, kind at +44, its result byte at base + 0x14F7B,
+  base = `sub_822DEC80()`) opens the keyboard object (`sub_822AFC20` / update `sub_822AFF18`: XGetOverlappedResult 0
+  -> read the buffer, 1223 -> cancelled (255)), checks the name 2 s later (empty -> message 17, a banned word
+  (`sub_822AD100`, two tables at 0x8283BF90 / 0x8283CB98) or all spaces (`sub_822F6DA8`) -> message 28, both back to
+  the keyboard 2 s later), then asks "This Cepter's name will be ..." with **XShowMessageBoxUI** (`sub_822B0098`, Yes
+  focused); Yes -> the name in the field, No -> the keyboard again.
+- **Two faults, two SDK fixes** (base handoffs still to make: 09 and 10):
+  1. A cancelled keyboard completed with ERROR_SUCCESS and only the extended error ERROR_CANCELLED (Xenia's): the game
+     read the cleared buffer as an empty name and asked again, so B could not leave the screen.
+     `xam_keyboard_cancel_result` (true): the result is ERROR_CANCELLED as well. Console 16:15: the game took it as
+     cancelled (255).
+  2. The SDK's ImGui message box was never seen on the console: its overlapped never completed (the trace: XN_SYS_UI on
+     at the box, never off), so the game held its system-UI state and took no input. `switch_message_box_focused`
+     (true, Switch): a message box is answered at once with the button the game focused (as `headless`), and every box
+     is logged (`XamShowMessageBoxUI: "<title>": "<text>" [buttons], focused button N`). Console 16:36: three names
+     accepted ("Yes"), the field filled, the story and the board played for 31 minutes. The player does not see the
+     question; a native Yes/No for the Switch is a follow-up.
+- **Diagnostic**: `xam_keyboard_trace` (off): after a keyboard closes, the game's keyboard object, buffer, stored name,
+  result byte and the task's first 64 bytes every 50 ms for 10 s, on the dispatch thread. (The first form made a
+  std::thread there and ended the program on the console: `std::thread::detach` threw under libnx; a lesson for any
+  SDK code on the Switch.)
+- **Ryujinx note**: two Ryujinx runs (kbT, kbT2) froze at boot while other sessions held the PC's CPU at 100 %; one had
+  the stack sampler off, so emu21's boot stop was the PC's load, not the sampler (the user's choice of the sampler off
+  stands).
+
+## Console performance (2026-11-19 16:36-17:11, handheld, the user's 31-minute session, package rc3 + the fixes)
+
+From `out/console_runs/user5` (renut_005.log, rex_profile.log; the stack sampler off, so no hot functions):
+
+| Scene (by draws a frame) | Windows | fps mean (min) | 1 % low (median) | Render thread | GPU | Draws/frame |
+|---|---|---|---|---|---|---|
+| Board / battle (120+) | 122 | 57.7 (52.8) | 10.4 | 4.5 ms (p99 max 7.9) | 7.3 ms (max 13.6) | 246 |
+| Field / story (40-120) | 41 | 58.8 (49.1) | 12.2 | 1.6 ms | 5.3 ms | 76 |
+| Menus (2-40) | 13 | 58.3 | 58.1 | 0.7 ms | 3.1 ms | 17 |
+| Movies (<2) | 3 | 48.9 | 28.8 | 1.4 ms | 1.2 ms | 1 |
+
+- **The GPU has room**: 7.3 ms of 16.7 on the board at 460.8 MHz (handheld); 4.0 ms of it the board's one blended
+  pixel shader (PS 50216CC1CA6DFDD2) at 1280x736, 0.9 ms resolves, 0.5 ms present. Docked (1080 lines, 768 MHz) not
+  measured.
+- **The frame rate's losses are the game thread's own hitches**: 517 of 519 board frames of 50 ms or more had no wait on
+  the renderer and short render / GPU frames (3-8 ms); none had a slow read or open of the SD card near it (300
+  `[io] SLOW` lines, none within a hitch). About 6 frames of ~90 ms every 10 s on the board account for the whole gap
+  from 60 fps (6 x 73 ms lost ~ 26 frames a window: 57.4 fps, measured 57.7). The game thread otherwise waits for the
+  renderer's frames-ahead limit 167 ms a second: the ordinary frame is well inside 16.7 ms.
+- **CPU**: the process 91 % of 400 % on average (154 % peak); the game's main thread 45 % of a core (90 % peak), the
+  render thread 20 % (36 %), the rest under 6 %; the XMV movie decoder ~97 % of a core while a movie plays (the three
+  movie windows, 48 fps presented). Clocks CPU 1020 / GPU 460.8 / memory 1600 MHz, SoC 34-39 C. The user: the CPU clock
+  is not to be changed.
+- **Next for the hitches**: one board session with `configs/renut_profile.toml` (the stack sampler on) names the main
+  thread's hot functions in them, for machine copies (the hot-function method) or a fix in the game's own code path.
