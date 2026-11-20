@@ -20,6 +20,7 @@
 #include <rex/filesystem.h>
 #include <rex/filesystem/devices/host_path_device.h>
 #include <rex/filesystem/lz4_blocks.h>  // rr6-nx (2026-11-10)
+#include <rex/filesystem/xmo.h>         // culdcept-nx (2026-11-20)
 #include <rex/logging.h>
 #include <rex/math.h>
 #include <rex/string/utf8.h>
@@ -194,6 +195,11 @@ Entry* HostPathDevice::ResolvePath(const std::string_view path) {
         found_path += std::string(rex::filesystem::kLz4BlocksSuffix);
         found = rex::filesystem::GetInfo(found_path, &exact_info);
       }
+      if (!found) {  // culdcept-nx (2026-11-20): or an XMA file as NAME.xmo (rex/filesystem/xmo.h)
+        found_path = exact_path;
+        found_path += std::string(rex::filesystem::kXmoSuffix);
+        found = rex::filesystem::GetInfo(found_path, &exact_info);
+      }
       if (found) {
         auto* exact_child = HostPathEntry::Create(this, current_entry, found_path, exact_info);
         if (!exact_child) {
@@ -216,6 +222,8 @@ Entry* HostPathDevice::ResolvePath(const std::string_view path) {
         std::string name = rex::path_to_utf8(info.name);
         if (rex::filesystem::HasLz4BlocksSuffix(name)) {  // rr6-nx: NAME.lz4b answers for NAME
           name.resize(name.size() - rex::filesystem::kLz4BlocksSuffix.size());
+        } else if (rex::filesystem::HasXmoSuffix(name)) {  // culdcept-nx: and NAME.xmo
+          name.resize(name.size() - rex::filesystem::kXmoSuffix.size());
         }
         return rex::string::utf8_equal_case(name, part);
       });

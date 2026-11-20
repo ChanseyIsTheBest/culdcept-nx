@@ -729,3 +729,42 @@ prof3; Sonic Racing's FTP restores ran until 15:07, during the game's start only
   1728x972, Blur's), and `banjo_renut_render_height_docked` defaults to 1080 in the code (it was 720; culdcept.toml has
   set 1080 since the first package, with `banjo_renut_display_height_docked = 1080`).
 - Built for the PC and the Switch (15:14, NRO md5 5b40e303...); the menu not yet opened on either.
+
+## The 30 fps movies in AV1? No (2026-11-20, the user: "Why dont we just usr av1 for 30fps videos?")
+
+Four movies are 30 fps: the intro logos CI_00-02 (15.7 s, 1.1 MB in H.265) and credit_us (3:36, 33.3 MB in H.265);
+the other 35 are 60 fps. On credit_us, against the WMV3 picture (PSNR, frames paired by order): H.265 at 35 % (the
+installer's) 33.3 MB, 41.4 dB; AV1 by SVT-AV1 14.2 MB, 41.3 dB; AV1 by the browser (Chromium's WebCodecs, libaom real
+time; test/av1_browser.html in the installer) 22.3 MB, 39.2 dB, worse than H.265 for its size. On the console (1020 MHz,
+tools/switch/av1bench, all 6,470 frames, 33.3 ms a frame): the SVT-AV1 file through dav1d on one thread 18.7 ms
+average, 190 ms worst, 13 % of frames late (frame-threaded: 4.5 ms, 0.7 % late, but pictures come out later than the
+port's movie hook takes them); the browser's AV1 on two threads 12.2 ms, none late; H.265 on NVDEC 4.6 ms, 9.3 ms
+worst, none late. The only AV1 that saves space (~19 MB, SVT-AV1) cannot be made in a browser and stutters without a
+frame-threaded hook. Every movie stays H.265 (the user: "Lets do h.265 for all the videos").
+
+## The music and effects in Opus (2026-11-20, the user: "Yeah I think I want to rencode the audio the to opus", "Lets go with 128k", "go ahead with the opus audio work work nonstop until its done")
+
+- **What the installer makes**: NAME.xmo for each 48 kHz XMA file in data/SOUND (`sdk/include/rex/filesystem/xmo.h`
+  has the format): the XMA file's RIFF header, packet headers, a frame table (bit position, length, last bit) and its
+  trailer (each file ends with a `seek` chunk), and the Opus stream (20 ms packets) made from the frames decoded in
+  order by the port's own xmaframes decoder. Music 128 kbit/s stereo, effects 96 / 48 kbit/s stereo / mono
+  (installer game.json `audio`). The 44.1 kHz voice clips (nv, ev, namc: 1,446 files) stay XMA, as do 36 short effects
+  that are smaller as XMA. 655 of 2,101 files, 290.1 MB -> 178.5 MB.
+- **What the port does**: HostPathEntry shows NAME.xmo as NAME, with NAME's size (the VFS index keeps it, as for .lz4b);
+  the handle synthesizes NAME a packet at a time: header, each frame's 15-bit length field and last bit as they were,
+  and a 72-bit tag (0xA55C, the sound id, the packet's index) in the packet's tag bits (the bits after each frame's
+  length field that starts in it, then the end of the frame that began before; at least 104 in every packet a frame
+  starts in), everything else zero. The game loads and loops it as before. XmaContext::DecodeXmoFrame reads the tag of
+  the frame's packet, finds the frame by its position, and takes its 512 samples from the Opus (libopus 1.3, devkitPro's,
+  on the Switch): the decoder goes on from the last frame, or after a jump (a loop) starts 320 ms before the frame (80
+  ms left the first frame after a seek at 20-25 dB from the in-order decode, 320 ms at 92 dB or better, 52 seeks). The
+  Opus data is read when the game reads the file (its thread, not the audio thread), up to 16 MB held.
+- **Checked**: tools/test_xmo.cpp on all 655 files (every packet byte for byte against the original's header, lengths and
+  last bits plus the tag; every frame found from its packet's tag; no original packet reads as a tag);
+  tools/xmo_compare.py (the Opus against the XMA decode: offset 0 samples, 14-20 dB waveform SNR, normal for a
+  perceptual codec); a browser-made .xmo (test/audio_browser.html) the same. Ryujinx with the user's replay (xmo3,
+  xmo4): 22 sounds from Opus, no [xmo] warning; the dumped frames of bgm_46_01, bgm_01_01 and bgm_01_03 match their
+  Opus at offset 0 (65-79 dB against ffmpeg's newer libopus); bgm_01_01's loop jumps back exactly 5,855 frames to
+  frame 745 and matches from there.
+- **Costs**: the first start after an install reads each .xmo's header for the index (Ryujinx: the full scan 39.6 s
+  against 10.8 s); later starts use the index (237 ms).

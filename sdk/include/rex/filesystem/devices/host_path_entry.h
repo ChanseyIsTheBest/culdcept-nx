@@ -28,7 +28,8 @@ class HostPathEntry : public Entry {
   ~HostPathEntry() override;
 
   // culdcept-nx (2026-11-20): `lz4_hint` from the VFS index: kLz4Unknown (check the name: a plain NAME beside it, the
-  // .lz4b header), kLz4NotPacked, or the size of the file a NAME.lz4b holds (no SD access: the index knows it).
+  // .lz4b header), kLz4NotPacked, or the size of the file a NAME.lz4b (or NAME.xmo) holds (no SD access: the index knows
+  // it).
   static constexpr int64_t kLz4Unknown = -2, kLz4NotPacked = -1;
   static HostPathEntry* Create(Device* device, Entry* parent,
                                const std::filesystem::path& full_path,
@@ -38,6 +39,11 @@ class HostPathEntry : public Entry {
   // rr6-nx (2026-11-10): host_path_ is an LZ4 block file (NAME.lz4b, rex/filesystem/lz4_blocks.h) shown as NAME with
   // the size of the file it holds; opened through OpenLz4Blocks, never mapped or written.
   bool lz4_blocks() const { return lz4_blocks_; }
+  // culdcept-nx (2026-11-20): host_path_ is a NAME.xmo (rex/filesystem/xmo.h: an XMA file whose frames are Opus), shown
+  // as NAME with that file's size; opened through OpenXmo, never mapped or written.
+  bool xmo() const { return xmo_; }
+  // Either of the two: the guest's file is made from the SD's one (read only, not mapped, its size the one it holds).
+  bool packed() const { return lz4_blocks_ || xmo_; }
   // culdcept-nx (2026-11-20): the size of the file on the SD (a NAME.lz4b's own size, not the size it holds), which the
   // VFS index compares with the SD's listing.
   uint64_t disk_size() const { return disk_size_; }
@@ -74,7 +80,7 @@ class HostPathEntry : public Entry {
   std::unique_ptr<rex::filesystem::FileHandle> TakeParked();
   void Park(std::unique_ptr<rex::filesystem::FileHandle> handle);
 
-  bool can_map() const override { return !lz4_blocks_; }
+  bool can_map() const override { return !packed(); }
   std::unique_ptr<memory::MappedMemory> OpenMapped(memory::MappedMemory::Mode mode, size_t offset,
                                                    size_t length) override;
   void update() override;
@@ -94,6 +100,7 @@ class HostPathEntry : public Entry {
   std::filesystem::path host_path_;
   bool children_complete_ = false;
   bool lz4_blocks_ = false;
+  bool xmo_ = false;
   uint64_t disk_size_ = 0;
 };
 

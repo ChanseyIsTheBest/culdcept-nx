@@ -231,7 +231,7 @@ void SerializeDirectory(Writer& w, HostPathEntry* dir, uint64_t* count) {
     // what PopulateEntry fed to HostPathEntry::Create.
     w.String(rex::path_to_utf8(child->host_path().filename()));
     w.Pod<uint64_t>(is_dir ? uint64_t(child->size()) : child->disk_size());
-    w.Pod<uint64_t>(!is_dir && child->lz4_blocks() ? uint64_t(child->size()) : kNotPacked);
+    w.Pod<uint64_t>(!is_dir && child->packed() ? uint64_t(child->size()) : kNotPacked);
     w.Pod<uint64_t>(child->create_timestamp());
     w.Pod<uint64_t>(child->access_timestamp());
     w.Pod<uint64_t>(child->write_timestamp());

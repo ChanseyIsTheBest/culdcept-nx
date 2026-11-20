@@ -9,6 +9,7 @@ add_library(rexaudio OBJECT
     xma_context.cpp
     xma_decoder.cpp
     xma_register_file.cpp
+    xmo_opus.cpp  # culdcept-nx (2026-11-20): Opus for NAME.xmo frames
     # NOP backend (always available)
     nop/nop_audio_system.cpp
 )
@@ -45,4 +46,18 @@ target_link_libraries(rexaudio
 )
 if(NOT REXGLUE_PLATFORM_SWITCH)
     target_link_libraries(rexaudio PUBLIC SDL3::SDL3)
+endif()
+
+# culdcept-nx (2026-11-20): xmo_opus.cpp's libopus (BSD-3): devkitPro's portlibs build on the Switch (a PC loads one at
+# run time).
+if(REXGLUE_PLATFORM_SWITCH)
+    set(_rex_opus_pl "$ENV{DEVKITPRO}/portlibs/switch")
+    if(DEFINED DEVKITPRO)
+        set(_rex_opus_pl "${DEVKITPRO}/portlibs/switch")
+    endif()
+    if(NOT EXISTS "${_rex_opus_pl}/lib/libopus.a")
+        message(FATAL_ERROR "libopus not found in ${_rex_opus_pl} (devkitPro's switch-libopus)")
+    endif()
+    target_include_directories(rexaudio PRIVATE "${_rex_opus_pl}/include/opus")
+    target_link_libraries(rexaudio PUBLIC "${_rex_opus_pl}/lib/libopus.a")
 endif()

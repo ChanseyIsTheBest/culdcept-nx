@@ -52,6 +52,7 @@ Libraries used by the SDK, the NRO and the code generator, in `sdk/thirdparty`, 
 | [xxHash](https://github.com/Cyan4973/xxHash) | BSD-2-Clause |
 | [LZ4](https://github.com/lz4/lz4) 1.10.0 by Yann Collet (`lib/lz4.c`: the decoder of the game files the installer packs with LZ4; from rr6-nx) | BSD-2-Clause |
 | [ZXC](https://github.com/hellobertrand/zxc) 0.15.0 by Bertrand Lebonnois (the decoder of the game files the installer packs with ZXC; from rr6-nx), with [rapidhash](https://github.com/Nicoshev/rapidhash) by Nicolas De Carli | BSD-3-Clause; MIT |
+| [libopus](https://opus-codec.org) 1.3 (devkitPro's `switch-libopus`, linked into the Switch build: the decoder of the music and effects the installer re-encodes to Opus; a PC build loads the system's at run time) | BSD-3-Clause |
 | [SIMDe](https://github.com/simd-everywhere/simde) | MIT |
 | [toml++](https://github.com/marzer/tomlplusplus) | MIT |
 | [o1heap](https://github.com/pavel-kirienko/o1heap) | MIT |

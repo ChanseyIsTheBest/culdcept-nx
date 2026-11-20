@@ -17,6 +17,7 @@
 #include <rex/filesystem/device.h>
 #include <rex/filesystem/devices/host_path_device.h>
 #include <rex/filesystem/lz4_blocks.h>
+#include <rex/filesystem/xmo.h>
 #include <rex/logging.h>
 #include <rex/math.h>
 #include <rex/memory/mapped_memory.h>
@@ -148,35 +149,45 @@ HostPathEntry* HostPathEntry::Create(Device* device, Entry* parent,
    * holds, unless a plain NAME lies next to it (an install extracted over an older one): the plain file wins and the
    * .lz4b stays an ordinary file the game never asks for.
    */
-  bool lz4_blocks = false;
+  /*
+   * culdcept-nx (2026-11-20): and NAME.xmo is the game's XMA file NAME with Opus in its frames (rex/filesystem/xmo.h),
+   * the same way: the size of NAME, and a plain NAME beside it wins.
+   */
+  bool lz4_blocks = false, xmo = false;
   uint64_t lz4_size = 0;
   const uint64_t disk_size = file_info.total_size;
-  if (lz4_hint >= 0 && file_info.type == rex::filesystem::FileInfo::Type::kFile && HasLz4BlocksSuffix(name)) {
+  const bool is_file = file_info.type == rex::filesystem::FileInfo::Type::kFile;
+  const bool lz4_name = is_file && HasLz4BlocksSuffix(name), xmo_name = is_file && !lz4_name && HasXmoSuffix(name);
+  const size_t suffix = lz4_name ? kLz4BlocksSuffix.size() : kXmoSuffix.size();
+  if (lz4_hint >= 0 && (lz4_name || xmo_name)) {
     // culdcept-nx (2026-11-20): from the VFS index, which made this choice in the full scan (and is thrown away when the
     // listing changes): no stat of the plain NAME and no read of the header, for each of a packed game's files.
-    lz4_blocks = true;
+    lz4_blocks = lz4_name;
+    xmo = xmo_name;
     lz4_size = uint64_t(lz4_hint);
-    name.resize(name.size() - kLz4BlocksSuffix.size());
-  } else if (lz4_hint == kLz4Unknown && file_info.type == rex::filesystem::FileInfo::Type::kFile &&
-             HasLz4BlocksSuffix(name)) {
+    name.resize(name.size() - suffix);
+  } else if (lz4_hint == kLz4Unknown && (lz4_name || xmo_name)) {
     std::filesystem::path plain = full_path;
     plain.replace_extension();
     rex::filesystem::FileInfo plain_info;
     if (rex::filesystem::GetInfo(plain, &plain_info)) {
       REXFS_WARN("{} and {} are both in the game folder: the plain file is used (delete one of them)",
                  rex::path_to_utf8(plain), rex::path_to_utf8(full_path));
-    } else if (ReadLz4BlocksSize(full_path, &lz4_size)) {
-      lz4_blocks = true;
-      name.resize(name.size() - kLz4BlocksSuffix.size());
+    } else if (lz4_name ? ReadLz4BlocksSize(full_path, &lz4_size) : ReadXmoSize(full_path, &lz4_size)) {
+      lz4_blocks = lz4_name;
+      xmo = xmo_name;
+      name.resize(name.size() - suffix);
     } else {
-      REXFS_WARN("{} is not a valid .lz4b file: left as it is", rex::path_to_utf8(full_path));
+      REXFS_WARN("{} is not a valid {} file: left as it is", rex::path_to_utf8(full_path),
+                 lz4_name ? ".lz4b" : ".xmo");
     }
   }
   auto path = rex::string::utf8_join_guest_paths(parent->path(), name);
   auto entry = new HostPathEntry(device, parent, path, full_path);
   entry->lz4_blocks_ = lz4_blocks;
+  entry->xmo_ = xmo;
   entry->disk_size_ = disk_size;
-  if (lz4_blocks) {
+  if (lz4_blocks || xmo) {
     file_info.total_size = size_t(lz4_size);
   }
 
@@ -221,8 +232,8 @@ X_STATUS HostPathEntry::Open(uint32_t desired_access, File** out_file) {
     return X_STATUS_SUCCESS;
   }
 
-  // rr6-nx (2026-11-10): an .lz4b file is read only.
-  if (lz4_blocks_ && (desired_access & (FileAccess::kGenericWrite | FileAccess::kFileWriteData |
+  // rr6-nx (2026-11-10): an .lz4b file is read only (culdcept-nx: and an .xmo).
+  if (packed() && (desired_access & (FileAccess::kGenericWrite | FileAccess::kFileWriteData |
                                         FileAccess::kFileAppendData | FileAccess::kGenericAll))) {
     return X_STATUS_ACCESS_DENIED;
   }
@@ -264,6 +275,11 @@ X_STATUS HostPathEntry::Open(uint32_t desired_access, File** out_file) {
     if (!file_handle) {
       return X_STATUS_NO_SUCH_FILE;
     }
+  } else if (xmo_) {
+    file_handle = OpenXmo(std::move(file_handle));  // culdcept-nx: logs why when it is not a valid .xmo file
+    if (!file_handle) {
+      return X_STATUS_NO_SUCH_FILE;
+    }
   }
   *out_file = new HostPathFile(desired_access, this, std::move(file_handle));
   return X_STATUS_SUCCESS;
@@ -271,7 +287,7 @@ X_STATUS HostPathEntry::Open(uint32_t desired_access, File** out_file) {
 
 std::unique_ptr<memory::MappedMemory> HostPathEntry::OpenMapped(memory::MappedMemory::Mode mode,
                                                                 size_t offset, size_t length) {
-  if (lz4_blocks_) {
+  if (packed()) {
     return nullptr;  // rr6-nx: the host file is the packed one
   }
   return memory::MappedMemory::Open(host_path_, mode, offset, length);
@@ -350,9 +366,9 @@ void HostPathEntry::update() {
     return;
   }
   if (file_info.type == rex::filesystem::FileInfo::Type::kFile) {
-    if (lz4_blocks_) {  // rr6-nx: the size of the file it holds
+    if (packed()) {  // rr6-nx: the size of the file it holds
       uint64_t size = 0;
-      if (!ReadLz4BlocksSize(host_path_, &size)) {
+      if (!(lz4_blocks_ ? ReadLz4BlocksSize(host_path_, &size) : ReadXmoSize(host_path_, &size))) {
         return;
       }
       file_info.total_size = size_t(size);
