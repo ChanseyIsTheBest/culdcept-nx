@@ -315,7 +315,8 @@ REXCVAR_DEFINE_INT32(banjo_renut_render_height_handheld, 720, "Banjo/Enhancement
                      "resolution whole. Shadow maps and the post-processing buffers keep the console's sizes. From the "
                      "next frame")
     .range(480, 1080);
-REXCVAR_DEFINE_INT32(banjo_renut_render_height_docked, 720, "Banjo/Enhancements",
+// culdcept-nx (2026-11-20, the user: "set docked default resolution in menu and in game to 1080"): 1080 by default.
+REXCVAR_DEFINE_INT32(banjo_renut_render_height_docked, 1080, "Banjo/Enhancements",
                      "NOT exact, the user's request (2026-10-21): banjo_renut_render_height_handheld for docked mode "
                      "(864 = 1536x864, 1.2x the game's; 900 = 1600x900; with banjo_renut_display_height_docked = 1080 "
                      "the HUD at 1920x1080). From the next frame on deko3d (blur-nx 2026-11-18), else read at start")

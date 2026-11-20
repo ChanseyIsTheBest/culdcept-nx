@@ -696,3 +696,36 @@ its own ran during the run.
 - The stutter frames now: file-system requests 12 %, the Huffman native 11 %, the small-block free 10 %, the loader wait
   8 %, the IDCT native 4 %, the colour conversion 4 %, the game's JPEG caller 3 %.
 - No crash, no error in the log.
+
+### The file cache at 256 (prof4, 2026-11-20 15:04-15:13, the user: "let's try 128 file cache", then "can we do 256 instead try that")
+
+The same replay at the same clocks (CPU 1020 / GPU 460.8 / memory 1600 MHz in every window), `filesystem_keep_open_max = 256`
+in the profile toml (out/console_tomls/culdcept_profile_slow_keep256.toml). The user's clock overlay was on screen, as in
+prof3; Sonic Racing's FTP restores ran until 15:07, during the game's start only (the replay began 15:06:25).
+
+| | prof3 (cap 32) | prof4 (cap 256) |
+|---|---|---|
+| Handles parked at most | 31 | 199 (the game uses about 200 files in the run) |
+| Closed beyond the cap | 302 | 0 |
+| Opens that took a parked handle | 877 | 1,014 |
+| Failed opens (the retry) | 0 | 0 |
+| Main thread in file-system requests (whole run) | 889 samples | 659 (-26 %) |
+| ... in the stutter frames | 1,008 of 8,554 | 768 of 8,449 |
+| Opens slower than the log's threshold | 89 | 76 |
+| The replay's frames of 40 ms or more, time in them, the longest | 260, 17.7 s, 409 ms | 257, 17.6 s, 404 ms |
+| Board / battle windows: mean fps, 1 % low median | 59.2, 12.1 | 59.2, 12.1 |
+
+- **The console keeps ~200 open files without a complaint**: no open failed, so the retry never ran.
+- **The closes are gone and file time fell a quarter, but the stutter did not move**: what is left of the file time in the
+  stutter frames is the path lookup's own open of each file (4.4 %) and reads (3.2 %); the stutter frames are now mostly
+  the JPEG chain, the small-block free and the loader wait.
+
+## The game menu for Culdcept (2026-11-20, the user: "hide smaa hide framerate cap set docked default resolution in menu and in game to 1080")
+
+- No **Framerate cap** row and no **SMAA** row (app/src/game_menu.cpp, MakeSettings): `frame_cap` and `banjo_renut_smaa`
+  stay in culdcept.toml (Off and false). SMAA would run on the image that holds both the board and the HUD (one shader,
+  one target), so it would smear the HUD's text.
+- **Docked resolution**: 1920x1080 is the menu's default choice, its help text says so in all 12 languages (it said
+  1728x972, Blur's), and `banjo_renut_render_height_docked` defaults to 1080 in the code (it was 720; culdcept.toml has
+  set 1080 since the first package, with `banjo_renut_display_height_docked = 1080`).
+- Built for the PC and the Switch (15:14, NRO md5 5b40e303...); the menu not yet opened on either.

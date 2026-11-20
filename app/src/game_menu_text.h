@@ -44,7 +44,7 @@ inline const char* const kMenuTextTable[kMenuLanguages][kMenuTextCount] = {
         "The game's language. System follows the console's language; a language the game does not have shows English.",
         "30 fps keeps a steady pace. 60 fps lets the game go faster where it can (uneven on busy tracks). Off: no cap.",
         "The size of the 3D image in handheld mode. Lower is faster; the HUD and text stay sharp.",
-        "The size of the 3D image on the TV (1728x972 by default). Lower is faster; the HUD and text are drawn at 1080p.",
+        "The size of the 3D image on the TV (1920x1080 by default). Lower is faster; the HUD and text are drawn at 1080p.",
         "Controller vibration.",
         "Edge smoothing on the 3D image after the game's own picture (costs a little GPU time).",
         "The game's own edge smoothing: smoother edges, a lower frame rate (4x: about 9 % lower than Off).",
@@ -81,7 +81,7 @@ inline const char* const kMenuTextTable[kMenuLanguages][kMenuTextCount] = {
         "30 i/s garde un rythme régulier. 60 i/s laisse le jeu aller plus vite quand il le peut (irrégulier sur les "
         "circuits chargés). Désactivé : aucune limite.",
         "La taille de l'image 3D en mode portable. Plus bas est plus rapide ; l'interface et le texte restent nets.",
-        "La taille de l'image 3D sur la TV (1728x972 par défaut). Plus bas est plus rapide ; l'interface et le texte "
+        "La taille de l'image 3D sur la TV (1920x1080 par défaut). Plus bas est plus rapide ; l'interface et le texte "
         "sont en 1080p.",
         "Vibrations de la manette.",
         "Lissage des contours de l'image 3D après l'image du jeu (coûte un peu de temps GPU).",
@@ -123,7 +123,7 @@ inline const char* const kMenuTextTable[kMenuLanguages][kMenuTextCount] = {
         "30 fps hält ein gleichmäßiges Tempo. 60 fps lässt das Spiel schneller laufen, wo es kann (ungleichmäßig auf "
         "vollen Strecken). Aus: keine Begrenzung.",
         "Die Größe des 3D-Bildes im Handheld-Modus. Niedriger ist schneller; HUD und Text bleiben scharf.",
-        "Die Größe des 3D-Bildes am Fernseher (standardmäßig 1728x972). Niedriger ist schneller; HUD und Text werden "
+        "Die Größe des 3D-Bildes am Fernseher (standardmäßig 1920x1080). Niedriger ist schneller; HUD und Text werden "
         "in 1080p gezeichnet.",
         "Controller-Vibration.",
         "Kantenglättung des 3D-Bildes nach dem Bild des Spiels (kostet etwas GPU-Zeit).",
@@ -165,7 +165,7 @@ inline const char* const kMenuTextTable[kMenuLanguages][kMenuTextCount] = {
         "30 fps mantiene un ritmo costante. 60 fps lascia il gioco andare più veloce dove può (irregolare sui circuiti "
         "affollati). No: nessun limite.",
         "La dimensione dell'immagine 3D in modalità portatile. Più bassa è più veloce; HUD e testo restano nitidi.",
-        "La dimensione dell'immagine 3D sulla TV (1728x972 di base). Più bassa è più veloce; HUD e testo sono "
+        "La dimensione dell'immagine 3D sulla TV (1920x1080 di base). Più bassa è più veloce; HUD e testo sono "
         "disegnati a 1080p.",
         "Vibrazione del controller.",
         "Smussatura dei bordi dell'immagine 3D dopo l'immagine del gioco (costa un po' di tempo GPU).",
@@ -207,7 +207,7 @@ inline const char* const kMenuTextTable[kMenuLanguages][kMenuTextCount] = {
         "30 fps mantiene un ritmo estable. 60 fps deja que el juego vaya más rápido donde puede (irregular en "
         "circuitos concurridos). No: sin límite.",
         "El tamaño de la imagen 3D en modo portátil. Más bajo es más rápido; el HUD y el texto siguen nítidos.",
-        "El tamaño de la imagen 3D en la TV (1728x972 por defecto). Más bajo es más rápido; el HUD y el texto se "
+        "El tamaño de la imagen 3D en la TV (1920x1080 por defecto). Más bajo es más rápido; el HUD y el texto se "
         "dibujan a 1080p.",
         "Vibración del mando.",
         "Suavizado de bordes de la imagen 3D después de la imagen del juego (cuesta algo de tiempo de GPU).",
@@ -247,7 +247,7 @@ inline const char* const kMenuTextTable[kMenuLanguages][kMenuTextCount] = {
         "30 kl./s utrzymuje równe tempo. 60 kl./s pozwala grze działać szybciej, gdy może (nierówno na zatłoczonych "
         "trasach). Wył.: bez limitu.",
         "Rozmiar obrazu 3D w trybie przenośnym. Niższy jest szybszy; HUD i tekst pozostają ostre.",
-        "Rozmiar obrazu 3D na telewizorze (domyślnie 1728x972). Niższy jest szybszy; HUD i tekst są rysowane w "
+        "Rozmiar obrazu 3D na telewizorze (domyślnie 1920x1080). Niższy jest szybszy; HUD i tekst są rysowane w "
         "1080p.",
         "Wibracje kontrolera.",
         "Wygładzanie krawędzi obrazu 3D po obrazie gry (kosztuje trochę czasu GPU).",
@@ -287,7 +287,7 @@ inline const char* const kMenuTextTable[kMenuLanguages][kMenuTextCount] = {
         "30 к/с держит ровный темп. 60 к/с позволяет игре идти быстрее, где получается (неровно на загруженных "
         "трассах). Выкл.: без ограничения.",
         "Размер 3D-изображения в портативном режиме. Ниже — быстрее; интерфейс и текст остаются чёткими.",
-        "Размер 3D-изображения на телевизоре (по умолчанию 1728x972). Ниже — быстрее; интерфейс и текст рисуются в "
+        "Размер 3D-изображения на телевизоре (по умолчанию 1920x1080). Ниже — быстрее; интерфейс и текст рисуются в "
         "1080p.",
         "Вибрация контроллера.",
         "Сглаживание краёв 3D-изображения после картинки игры (немного нагружает GPU).",
@@ -327,7 +327,7 @@ inline const char* const kMenuTextTable[kMenuLanguages][kMenuTextCount] = {
         "30 fps mantém um ritmo estável. 60 fps deixa o jogo ir mais rápido onde puder (irregular em pistas cheias). "
         "Não: sem limite.",
         "O tamanho da imagem 3D no modo portátil. Menor é mais rápido; o HUD e o texto continuam nítidos.",
-        "O tamanho da imagem 3D na TV (1728x972 por padrão). Menor é mais rápido; o HUD e o texto são desenhados em "
+        "O tamanho da imagem 3D na TV (1920x1080 por padrão). Menor é mais rápido; o HUD e o texto são desenhados em "
         "1080p.",
         "Vibração do controle.",
         "Suavização de bordas da imagem 3D depois da imagem do jogo (custa um pouco de tempo da GPU).",
@@ -368,7 +368,7 @@ inline const char* const kMenuTextTable[kMenuLanguages][kMenuTextCount] = {
         "ゲームの言語。「システム」は本体の言語に従います。ゲームにない言語は英語で表示されます。",
         "30fpsは安定したペースを保ちます。60fpsは可能な場面でより速く動きます（混雑したコースでは不安定）。オフ：上限なし。",
         "携帯モードでの3D画像のサイズ。低いほど速くなります。HUDと文字は鮮明なままです。",
-        "TVでの3D画像のサイズ（標準は1728x972）。低いほど速くなります。HUDと文字は1080pで描画されます。",
+        "TVでの3D画像のサイズ（標準は1920x1080）。低いほど速くなります。HUDと文字は1080pで描画されます。",
         "コントローラーの振動。",
         "ゲームの画像の後に3D画像のエッジを滑らかにします（GPU時間を少し使います）。",
         "ゲーム自身のアンチエイリアス：エッジが滑らかになり、フレームレートが下がります（4x：オフより約9%低下）。",
@@ -404,7 +404,7 @@ inline const char* const kMenuTextTable[kMenuLanguages][kMenuTextCount] = {
         "30fps는 일정한 속도를 유지합니다. 60fps는 가능한 곳에서 더 빠르게 실행됩니다(혼잡한 코스에서는 고르지 않음). "
         "끔: 제한 없음.",
         "휴대 모드의 3D 화면 크기. 낮을수록 빠릅니다. HUD와 글자는 선명하게 유지됩니다.",
-        "TV의 3D 화면 크기(기본 1728x972). 낮을수록 빠릅니다. HUD와 글자는 1080p로 그려집니다.",
+        "TV의 3D 화면 크기(기본 1920x1080). 낮을수록 빠릅니다. HUD와 글자는 1080p로 그려집니다.",
         "컨트롤러 진동.",
         "게임 화면 이후 3D 화면의 가장자리를 부드럽게 합니다(GPU 시간을 조금 사용).",
         "게임 자체의 안티에일리어싱: 가장자리가 부드러워지고 프레임이 낮아집니다(4x: 끔보다 약 9% 낮음).",
@@ -439,7 +439,7 @@ inline const char* const kMenuTextTable[kMenuLanguages][kMenuTextCount] = {
         "游戏语言。“系统”跟随主机语言；游戏没有的语言会显示为英语。",
         "30 帧保持稳定节奏。60 帧让游戏在能跑快时更快（拥挤的赛道上不均匀）。关：不限制。",
         "掌机模式下 3D 画面的大小。越低越快；HUD 和文字保持清晰。",
-        "电视上 3D 画面的大小（默认 1728x972）。越低越快；HUD 和文字以 1080p 绘制。",
+        "电视上 3D 画面的大小（默认 1920x1080）。越低越快；HUD 和文字以 1080p 绘制。",
         "手柄震动。",
         "在游戏画面之后对 3D 画面做边缘平滑（占用少量 GPU 时间）。",
         "游戏自带的抗锯齿：边缘更平滑，帧率更低（4x：比关低约 9%）。",
@@ -472,7 +472,7 @@ inline const char* const kMenuTextTable[kMenuLanguages][kMenuTextCount] = {
         "遊戲語言。「系統」會跟隨主機語言；遊戲沒有的語言會以英文顯示。",
         "30 fps 保持穩定節奏。60 fps 讓遊戲在可以時跑得更快（擁擠的賽道上不平均）。關：不限制。",
         "掌上模式下 3D 畫面的大小。越低越快；HUD 和文字保持清晰。",
-        "電視上 3D 畫面的大小（預設 1728x972）。越低越快；HUD 和文字以 1080p 繪製。",
+        "電視上 3D 畫面的大小（預設 1920x1080）。越低越快；HUD 和文字以 1080p 繪製。",
         "控制器震動。",
         "在遊戲畫面之後對 3D 畫面進行邊緣平滑（佔用少量 GPU 時間）。",
         "遊戲本身的反鋸齒：邊緣更平滑，影格率較低（4x：比關低約 9%）。",

@@ -55,6 +55,10 @@ and replays). Details and evidence: `docs/culdcept-notes.md`; the timeline: `doc
       NEON path); on the console (prof3) the IDCT a third cheaper, the Huffman decode 14 % cheaper;
     - not given a native, and why: the small-block free (its time is a list walk a native cannot shorten), the colour
       conversion (a native would make the same table lookups), the wait (time spent waiting for a file).
+    - the file cache at 256 instead of 32 (prof4, the user's request; a toml line, not the shipped default): about 200
+      files kept open, none closed for the cap, 0 failed opens, file-system time -26 %; the stutter numbers unchanged.
+13. The game menu (2026-11-20, the user's request): no Framerate cap and no SMAA rows; the docked resolution's default
+    1920x1080 in the menu, its help text and the code. Built for the PC and the Switch; not yet seen on screen.
 
 ## Handoffs for the base (`D:\culdceptsaga\out\handoff`, README.md there)
 
