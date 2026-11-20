@@ -902,10 +902,13 @@ if(REXGLUE_PLATFORM_SWITCH)
     endif()
     # katamari-nx (2026-11-02, the user's request): author ChanseyIsTheBest, the user's icon (the cover art).
     # 2026-11-05: version 1.0.1, the game's memory and the NRO's code on 2 MB blocks, and the boot's cvars.
+    # culdcept-nx (2026-11-20, the user: "For the final nro please use the image i put in your folder make the version 1.0.0
+    # and the author ChanseyIsTheBest"): version 1.0.0; the icon is the user's image (D:\culdceptsaga, 1024x1024) at
+    # 256x256.
     rexglue_switch_add_nro(renut
         NAME "Culdcept Saga"
         AUTHOR "ChanseyIsTheBest"
-        VERSION "1.0.1"
+        VERSION "1.0.0"
         ${RENUT_ICON_ARG})
 endif()
 
