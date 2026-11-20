@@ -707,6 +707,9 @@ if(REXGLUE_PLATFORM_SWITCH)
     set(_banjo_sdk_no_lto)
     if(BANJO_SWITCH_SDK_OPT AND REXGLUE_OUTPUT_IN_BUILD AND BANJO_SWITCH_SDK_OBJECT_OPT)
         list(APPEND _banjo_sdk_opt_targets rexaudio rexcore rexfilesystem rexinput rexui)
+        # culdcept-nx (2026-11-20, the user: "We probably want the decompression to get pgo training as well"): the
+        # .lz4b codecs (rr6-nx's rexblockcodecs: LZ4 1.10.0, ZXC 0.15.0) in the LTO and the PGO profile too.
+        list(APPEND _banjo_sdk_opt_targets rexblockcodecs)
         set(_banjo_sdk_no_lto
             "${CMAKE_CURRENT_SOURCE_DIR}/../sdk/src/core/threading_switch.cpp"
             "${CMAKE_CURRENT_SOURCE_DIR}/../sdk/src/ui/switch_perf.cpp"
@@ -872,6 +875,39 @@ endforeach()
 # copy beside the runtime DLL's, which keeps XMA's).
 if(TARGET libavcodec)
     target_link_libraries(renut PRIVATE libavcodec libavutil)
+endif()
+
+# culdcept-nx (2026-11-20, the user: hardware H.265 movies): nxvideo (tools/switch/nxvideo), the movies' decoder on the
+# Switch's NVDEC: devkitPro's switch-ffmpeg 7.1 (built with averne's nvtegra backend, as Moonlight-Switch and SwitchWave
+# use it) linked with the shim into one object whose only global symbols are nxv_*, so FFmpeg 7.1's names never meet
+# the port's own FFmpeg 4.4 above (the XMA audio, the software WMV3 path). Built when devkitPro's FFmpeg has nvtegra.
+if(REXGLUE_PLATFORM_SWITCH)
+    option(CULDCEPT_NXVIDEO "The movies' H.265 / NVDEC decoder (tools/switch/nxvideo)" ON)
+    set(_nxv_pl "${DEVKITPRO}/portlibs/switch")
+    if(CULDCEPT_NXVIDEO AND EXISTS "${_nxv_pl}/include/libavutil/hwcontext_nvtegra.h")
+        set(_nxv_src "${CMAKE_CURRENT_SOURCE_DIR}/../tools/switch/nxvideo")
+        set(_nxv_out "${CMAKE_CURRENT_BINARY_DIR}/nxvideo")
+        file(MAKE_DIRECTORY "${_nxv_out}")
+        set(_nxv_keep)
+        foreach(_s nxv_open nxv_decode nxv_flush nxv_close nxv_is_hw nxv_version)
+            list(APPEND _nxv_keep "--keep-global-symbol=${_s}")
+        endforeach()
+        add_custom_command(OUTPUT "${_nxv_out}/nxvideo.o"
+            COMMAND "${CMAKE_C_COMPILER}" -O2 -ffunction-sections -fdata-sections -march=armv8-a+crc+crypto
+                    -mtune=cortex-a57 -mtp=soft -ftls-model=local-exec -fPIE -D__SWITCH__ -DNX -D_GNU_SOURCE
+                    "-I${_nxv_pl}/include" "-I${DEVKITPRO}/libnx/include" -c "${_nxv_src}/nxvideo.c" -o "${_nxv_out}/shim.o"
+            COMMAND "${CMAKE_LINKER}" -r -o "${_nxv_out}/full.o" "${_nxv_out}/shim.o"
+                    --start-group "${_nxv_pl}/lib/libavcodec.a" "${_nxv_pl}/lib/libavutil.a" --end-group
+            COMMAND "${CMAKE_OBJCOPY}" ${_nxv_keep} "${_nxv_out}/full.o" "${_nxv_out}/nxvideo.o"
+            DEPENDS "${_nxv_src}/nxvideo.c" "${_nxv_src}/nxvideo.h"
+            COMMENT "nxvideo: FFmpeg 7.1 with nvtegra in one object, only nxv_* global"
+            VERBATIM)
+        set_source_files_properties("${_nxv_out}/nxvideo.o" PROPERTIES EXTERNAL_OBJECT TRUE GENERATED TRUE)
+        target_sources(renut PRIVATE "${_nxv_out}/nxvideo.o")
+        target_include_directories(renut PRIVATE "${_nxv_src}")
+        target_compile_definitions(renut PRIVATE CULDCEPT_NXVIDEO=1)
+        message(STATUS "nxvideo: H.265 / NVDEC movies (devkitPro's switch-ffmpeg with nvtegra)")
+    endif()
 endif()
 
 # Nintendo Switch: renut.nro next to the ELF. On the SD card it goes in

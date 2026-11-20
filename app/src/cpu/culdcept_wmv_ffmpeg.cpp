@@ -15,6 +15,12 @@
 // takes them (the pts kept as it keeps it), decoded, and written as I420 into the player's buffer by get output; 2 both:
 // the game's decoder runs and its picture is shown, FFmpeg decodes the same bytes (taken as the stream node hands them
 // out, sub_8256FEE8) and the planes are compared ([wmv] lines).
+//
+// 2026-11-20 (the user: "I think getting hardware h.265 decoding would br good in thr long run ... lets do that"): a movie
+// whose first frame is H.265 (the installer re-encodes the WMV3 video, frame for frame, keeping the ASF file, its audio,
+// timing and the WMV3 stream's sequence header the game's player sets up from) is decoded by nxvideo
+// (tools/switch/nxvideo: devkitPro's FFmpeg 7.1 with averne's nvtegra backend, on the Switch's NVDEC; its software
+// HEVC decoder where NVDEC does not open). culdcept_movie_nvdec: 0 software, 1 H.265 on NVDEC, 2 WMV3 too.
 #include <rex/cvar.h>
 #include <rex/hook.h>
 #include <rex/logging.h>
@@ -32,6 +38,10 @@
 #include <unordered_map>
 #include <vector>
 
+#if CULDCEPT_NXVIDEO
+#include "nxvideo.h"
+#endif
+
 extern "C" {
 #include <libavcodec/avcodec.h>
 #include <libavutil/frame.h>
@@ -42,6 +52,10 @@ extern "C" {
 REXCVAR_DEFINE_INT32(culdcept_wmv_ffmpeg, 1, "Culdcept",
                      "The movies' WMV3 video: 0 the game's decoder (guest code), 1 FFmpeg on the host, 2 both, compared "
                      "([wmv] log lines; the game's picture is shown)")
+    .range(0, 2);
+REXCVAR_DEFINE_INT32(culdcept_movie_nvdec, 1, "Culdcept",
+                     "The movies on the Switch's hardware decoder (NVDEC, through nxvideo): 0 none (software), 1 the "
+                     "H.265 movies the installer made, 2 the game's WMV3 movies too")
     .range(0, 2);
 
 REX_EXTERN(__imp__sub_8259EE00);  // decode (C, u32* pcb)
@@ -106,7 +120,29 @@ struct Movie {
   uint64_t timed = 0;
   std::chrono::steady_clock::time_point since{};
   uint32_t width = 0, height = 0;
+  // 2026-11-20: nxvideo (H.265 always; WMV3 with culdcept_movie_nvdec 2)
+  bool checked = false;  // the first frame looked at
+  bool hevc = false;     // the movie's video is H.265
+  bool nxv_used = false;
+#if CULDCEPT_NXVIDEO
+  NxvDecoder *nxv = nullptr;
+  NxvPicture pic{};
+#endif
 };
+
+// An H.265 access unit in Annex B: a start code, then a VPS (32), SPS (33), PPS (34) or access unit delimiter (35). A
+// WMV3 frame (simple / main profile) carries no start codes.
+bool LooksHevc(const std::vector<uint8_t> &b) {
+  size_t i = 0;
+  if (b.size() >= 6 && b[0] == 0 && b[1] == 0 && b[2] == 0 && b[3] == 1)
+    i = 4;
+  else if (b.size() >= 5 && b[0] == 0 && b[1] == 0 && b[2] == 1)
+    i = 3;
+  else
+    return false;
+  const uint8_t type = (b[i] >> 1) & 0x3F;
+  return (b[i] & 0x80) == 0 && type >= 32 && type <= 35 && b[i + 1] == 1;  // forbidden bit 0, layer 0, temporal id 1
+}
 
 std::mutex g_movies_mutex;
 std::unordered_map<uint32_t, Movie *> g_movies;  // by the guest codec's address
@@ -120,6 +156,12 @@ Movie &MovieFor(uint32_t c) {
 }
 
 void CloseDecoder(Movie &m) {
+#if CULDCEPT_NXVIDEO
+  if (m.nxv)
+    nxv_close(m.nxv);
+  m.nxv = nullptr;
+#endif
+  m.checked = m.hevc = m.nxv_used = false;
   if (m.frame)
     av_frame_free(&m.frame);
   if (m.packet)
@@ -172,9 +214,52 @@ bool OpenDecoder(Movie &m, const uint8_t *base, uint32_t v) {
 }
 
 // One frame's bytes through FFmpeg: m.have and m.frame.
+// nxvideo for this movie (H.265, or WMV3 with culdcept_movie_nvdec 2): false when it is not used.
+bool NxvDecode(Movie &m, const uint8_t *base, uint32_t v, const std::vector<uint8_t> &bytes) {
+  if (!m.checked) {
+    m.checked = true;
+    m.hevc = LooksHevc(bytes);
+    const int nvdec = REXCVAR_GET(culdcept_movie_nvdec);
+    m.nxv_used = m.hevc || nvdec >= 2;
+#if CULDCEPT_NXVIDEO
+    if (m.nxv_used) {
+      m.width = Ld32(base, v + kWidth);
+      m.height = Ld32(base, v + kHeight);
+      const uint32_t seq = Ld32(base, v + kSequence), seq_len = Ld16(base, v + kSequenceLen);
+      const bool wmv3 = !m.hevc;
+      char why[160] = {};
+      m.nxv = nxv_open(m.hevc ? NXV_HEVC : NXV_WMV3, wmv3 && seq && seq_len < 64 ? base + seq : nullptr,
+                       wmv3 ? int(seq_len) : 0, int(m.width), int(m.height), m.hevc ? nvdec >= 1 : 1, why, sizeof(why));
+      REXLOG_INFO("[wmv] {}: {}", m.hevc ? "an H.265 movie" : "a WMV3 movie on nxvideo", m.nxv ? why : "did not open");
+      if (!m.nxv && !m.hevc)
+        m.nxv_used = false;  // WMV3: the 4.4 path as before
+    }
+#else
+    if (m.hevc)
+      REXLOG_WARN("[wmv] an H.265 movie, and this build has no H.265 decoder (nxvideo is the Switch's): not shown");
+    m.nxv_used = m.hevc;
+#endif
+  }
+  if (!m.nxv_used)
+    return false;
+#if CULDCEPT_NXVIDEO
+  const int r = m.nxv ? nxv_decode(m.nxv, bytes.data(), int(bytes.size()), &m.pic) : -1;
+  m.have = r == 1;
+#else
+  m.have = false;
+#endif
+  if (m.have)
+    ++m.decoded;
+  else if (++m.failed <= 8)
+    REXLOG_WARN("[wmv] nxvideo gave no picture for frame {} ({} bytes)", m.frames, bytes.size());
+  return true;
+}
+
 void Decode(Movie &m, const uint8_t *base, uint32_t v, const std::vector<uint8_t> &bytes) {
   m.have = false;
   ++m.frames;
+  if (!bytes.empty() && NxvDecode(m, base, v, bytes))
+    return;
   if (bytes.empty() || !OpenDecoder(m, base, v)) {
     ++m.failed;
     return;
@@ -233,6 +318,32 @@ void WriteI420(Movie &m, uint8_t *base, uint32_t buf, uint32_t w, uint32_t h) {
   }
   rex::memory::MarkStoreCardsAt(base, buf, w * h * 3 / 2);
 }
+
+#if CULDCEPT_NXVIDEO
+// nxvideo's picture (YUV420P, or NV12 from NVDEC) into the player's I420 buffer.
+void WriteI420Nxv(const NxvPicture &p, uint8_t *base, uint32_t buf, uint32_t w, uint32_t h) {
+  const uint32_t fw = std::min<uint32_t>(w, uint32_t(p.width)), fh = std::min<uint32_t>(h, uint32_t(p.height));
+  const uint32_t y_plane = buf, u_plane = buf + w * h, v_plane = buf + w * h + (w / 2) * (h / 2);
+  for (uint32_t y = 0; y < fh; ++y)
+    std::memcpy(base + y_plane + y * w, p.data[0] + size_t(y) * size_t(p.linesize[0]), fw);
+  if (p.nv12) {
+    for (uint32_t y = 0; y < fh / 2; ++y) {
+      const uint8_t *uv = p.data[1] + size_t(y) * size_t(p.linesize[1]);
+      uint8_t *u = base + u_plane + y * (w / 2), *vv = base + v_plane + y * (w / 2);
+      for (uint32_t x = 0; x < fw / 2; ++x) {
+        u[x] = uv[2 * x];
+        vv[x] = uv[2 * x + 1];
+      }
+    }
+  } else {
+    for (uint32_t y = 0; y < fh / 2; ++y) {
+      std::memcpy(base + u_plane + y * (w / 2), p.data[1] + size_t(y) * size_t(p.linesize[1]), fw / 2);
+      std::memcpy(base + v_plane + y * (w / 2), p.data[2] + size_t(y) * size_t(p.linesize[2]), fw / 2);
+    }
+  }
+  rex::memory::MarkStoreCardsAt(base, buf, w * h * 3 / 2);
+}
+#endif
 
 void TimeLine(Movie &m, uint32_t c, double decode_ms, double copy_ms) {
   const auto now = std::chrono::steady_clock::now();
@@ -349,7 +460,21 @@ REX_HOOK_RAW(sub_8259EE60) {
     return;
   }
   uint32_t status = kStatusNoMoreOutput;
-  if (m.have && m.frame->format == AV_PIX_FMT_YUV420P) {
+  if (m.nxv_used) {
+#if CULDCEPT_NXVIDEO
+    if (m.have) {
+      const auto t0 = std::chrono::steady_clock::now();
+      WriteI420Nxv(m.pic, base, buf, w, h);
+      m.copy_ms += std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - t0).count();
+      St32(base, pcb, frame_size);
+      status = kStatusOk;
+    } else
+#endif
+    {
+      St32(base, pcb, 0);
+    }
+    St32(base, p7, 0);
+  } else if (m.have && m.frame->format == AV_PIX_FMT_YUV420P) {
     const auto t0 = std::chrono::steady_clock::now();
     WriteI420(m, base, buf, w, h);
     m.copy_ms += std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - t0).count();
@@ -380,6 +505,10 @@ REX_HOOK_RAW(sub_8259ECF8) {
     std::lock_guard lock(m.mutex);
     if (m.avctx)
       avcodec_flush_buffers(m.avctx);
+#if CULDCEPT_NXVIDEO
+    if (m.nxv)
+      nxv_flush(m.nxv);
+#endif
     m.have = false;
   }
   __imp__sub_8259ECF8(ctx, base);
@@ -391,9 +520,15 @@ REX_HOOK_RAW(sub_8259ED50) {
   {
     Movie &m = MovieFor(c);
     std::lock_guard lock(m.mutex);
-    if (m.avctx && (m.frames || m.failed))
-      REXLOG_INFO("[wmv] {:08X}: movie closed: {} frames, {} decoded by FFmpeg, {} not, {} damaged", c, m.frames,
-                  m.decoded, m.failed, m.damaged);
+    if ((m.avctx || m.nxv_used) && (m.frames || m.failed)) {
+#if CULDCEPT_NXVIDEO
+      const char *by = m.nxv_used ? (m.nxv && nxv_is_hw(m.nxv) ? "NVDEC" : "nxvideo (software)") : "FFmpeg";
+#else
+      const char *by = m.nxv_used ? "nothing (no H.265 decoder)" : "FFmpeg";
+#endif
+      REXLOG_INFO("[wmv] {:08X}: movie closed{}: {} frames, {} decoded by {}, {} not, {} damaged", c,
+                  m.hevc ? " (H.265)" : "", m.frames, m.decoded, by, m.failed, m.damaged);
+    }
     CloseDecoder(m);
     m.frames = m.decoded = m.failed = m.damaged = m.compared = 0;
     m.timed = 0;
