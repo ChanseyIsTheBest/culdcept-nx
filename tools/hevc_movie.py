@@ -79,8 +79,10 @@ class Asf:
 
     def media_objects(self):
         """Every media object, in the order its first payload was sent: dicts of stream, number, time (ms), key, send,
-        data."""
+        data, sends. 2026-11-20: `sends` is each of its payloads' (offset, packet send time), and self.packets_end the
+        last packet's send time plus its duration, for write_asf's send times and durations (as lib/asf.js)."""
         buf, objs, order = self.buf, {}, []
+        self.packets_end = 0
         p = self.data + 50
         for _ in range(self.packets):
             start = p
@@ -94,7 +96,8 @@ class Asf:
             packet_len, i = read_len(buf, i, (flags >> 5) & 3)
             _, i = read_len(buf, i, (flags >> 1) & 3)  # sequence
             padding, i = read_len(buf, i, (flags >> 3) & 3)
-            send, _dur = struct.unpack_from('<IH', buf, i)
+            send, duration = struct.unpack_from('<IH', buf, i)
+            self.packets_end = max(self.packets_end, send + duration)
             i += 6
             if not packet_len:
                 packet_len = self.packet_size
@@ -123,9 +126,10 @@ class Asf:
                 o = objs.get(key)
                 if o is None or offset == 0 and o['data'] is not None and len(o['data']) >= o['size']:
                     o = {'stream': stream_byte & 0x7F, 'number': number, 'size': obj_size, 'time': pts,
-                         'key': bool(stream_byte & 0x80), 'send': send, 'rep': rep, 'data': bytearray()}
+                         'key': bool(stream_byte & 0x80), 'send': send, 'rep': rep, 'data': bytearray(), 'sends': []}
                     objs[key] = o
                     order.append(o)
+                o['sends'].append((offset, send))
                 o['data'][offset:offset + plen] = buf[i:i + plen]
                 i += plen
             p = start + self.packet_size
@@ -165,36 +169,91 @@ def access_units(raw):
 
 
 def write_asf(src, objs, out_path):
-    """`objs` (media objects, video data replaced) as the new file: src's header, packets of src's size, a new index."""
+    """`objs` (media objects, video data replaced) as the new file: src's header, packets of src's size, a new index.
+
+    2026-11-20 (the console: the H.265 movies played slowly and without sound), as lib/asf.js's write(), byte for byte:
+    each packet's send time is the original send time of the bytes it starts with (for a replaced object, of the same
+    fraction of the original's bytes), never earlier than the packet before's, and its duration the time to the next
+    packet's, as the originals have them; and an audio object (any but the video's) is never split across packets, as
+    the originals' muxer never splits one (the game's player lost a split one's audio and paced the movie slower). One
+    that does not fit in the packet being filled waits for the next packet, which it starts."""
     P = src.packet_size
     packets = []
-    first_packet = {}   # id(object) -> (first packet, packet count)
-    pkt = None
+    first_packet = {}   # id(object) -> [first packet, packet count]
+    state = {'pkt': None, 'last_send': 0}
+    deferred = []
 
-    def new_packet(send):
+    def send_at(o, offset):
+        f = o.get('sends')
+        if not f:
+            return o['send']
+        x = offset * o['size'] / len(o['data']) if len(o['data']) else 0  # the same fraction of the original object
+        t = f[0][1]
+        for off, snd in f:
+            if off <= x:
+                t = snd
+            else:
+                break
+        return t
+
+    def new_packet(o, offset):
+        if state['pkt'] is not None:
+            packets.append(state['pkt'])
+        state['last_send'] = max(state['last_send'], send_at(o, offset))
         # error correction 3, flags 2, BYTE padding 1, send 4, duration 2, payload flags 1
-        return {'send': send, 'payloads': [], 'used': 13}
+        state['pkt'] = {'send': state['last_send'], 'payloads': [], 'used': 13}
+
+    def place(o, offset, take, over):
+        pkt = state['pkt']
+        pkt['payloads'].append((o, offset, o['data'][offset:offset + take]))
+        pkt['used'] += over + take
+        ent = first_packet.setdefault(id(o), [len(packets), 0])
+        ent[1] = len(packets) - ent[0] + 1
+
+    def fits(o, over):
+        pkt = state['pkt']
+        return pkt is not None and len(pkt['payloads']) < 63 and pkt['used'] + over + len(o['data']) <= P
+
+    def flush():  # the waiting whole objects at the start of a new packet (each fits in an empty one)
+        while deferred:
+            d, dover = deferred[0]
+            if not fits(d, dover):
+                new_packet(d, 0)
+            if not fits(d, dover):
+                raise ValueError(f"stream {d['stream']} object {d['number']} ({len(d['data'])} bytes) fits in no packet")
+            place(d, 0, len(d['data']), dover)
+            deferred.pop(0)
 
     for o in objs:
         data = o['data']
         over = 9 + len(o['rep'])  # stream, number, offset, replicated length, replicated data, payload length
+        if o['stream'] != src.video_stream and 13 + over + len(data) <= P:
+            if not deferred and fits(o, over):
+                place(o, 0, len(data), over)
+            else:
+                deferred.append((o, over))  # after the ones already waiting, in their order
+            continue
         offset = 0
         while True:
+            pkt = state['pkt']
             if pkt is None or len(pkt['payloads']) >= 63 or pkt['used'] + over + 1 > P:
-                if pkt is not None:
-                    packets.append(pkt)
-                pkt = new_packet(o['send'])
-            room = P - pkt['used'] - over
-            take = min(room, len(data) - offset)
-            pkt['payloads'].append((o, offset, data[offset:offset + take]))
-            pkt['used'] += over + take
-            ent = first_packet.setdefault(id(o), [len(packets), 0])
-            ent[1] = len(packets) - ent[0] + 1
+                new_packet(o, offset)
+                flush()  # the waiting audio first in the new packet
+                pkt = state['pkt']
+                if len(pkt['payloads']) >= 63 or pkt['used'] + over + 1 > P:
+                    new_packet(o, offset)
+                    pkt = state['pkt']
+            take = min(P - pkt['used'] - over, len(data) - offset)
+            place(o, offset, take, over)
             offset += take
             if offset >= len(data):
                 break
-    if pkt is not None:
-        packets.append(pkt)
+    flush()
+    if state['pkt'] is not None:
+        packets.append(state['pkt'])
+    for k, p in enumerate(packets):
+        nxt = packets[k + 1]['send'] if k + 1 < len(packets) else max(getattr(src, 'packets_end', 0), p['send'])
+        p['duration'] = min(0xFFFF, max(0, nxt - p['send']))
 
     body = bytearray()
     for p in packets:
@@ -208,7 +267,7 @@ def write_asf(src, objs, out_path):
         else:
             padding -= 1  # the WORD field takes one more byte
             b += bytes([0x11, 0x5D]) + struct.pack('<H', padding)
-        b += struct.pack('<IH', p['send'], 0)
+        b += struct.pack('<IH', p['send'], p['duration'])
         b.append(0x80 | len(p['payloads']))
         for o, off, chunk in p['payloads']:
             b.append((0x80 if o['key'] else 0) | o['stream'])
