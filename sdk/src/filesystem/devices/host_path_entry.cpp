@@ -141,7 +141,7 @@ HostPathEntry::~HostPathEntry() {
 
 HostPathEntry* HostPathEntry::Create(Device* device, Entry* parent,
                                      const std::filesystem::path& full_path,
-                                     rex::filesystem::FileInfo file_info) {
+                                     rex::filesystem::FileInfo file_info, int64_t lz4_hint) {
   std::string name = rex::path_to_utf8(file_info.name);
   /*
    * rr6-nx (2026-11-10): NAME.lz4b is the game's NAME (rex/filesystem/lz4_blocks.h), with the size of the file it
@@ -150,7 +150,15 @@ HostPathEntry* HostPathEntry::Create(Device* device, Entry* parent,
    */
   bool lz4_blocks = false;
   uint64_t lz4_size = 0;
-  if (file_info.type == rex::filesystem::FileInfo::Type::kFile && HasLz4BlocksSuffix(name)) {
+  const uint64_t disk_size = file_info.total_size;
+  if (lz4_hint >= 0 && file_info.type == rex::filesystem::FileInfo::Type::kFile && HasLz4BlocksSuffix(name)) {
+    // culdcept-nx (2026-11-20): from the VFS index, which made this choice in the full scan (and is thrown away when the
+    // listing changes): no stat of the plain NAME and no read of the header, for each of a packed game's files.
+    lz4_blocks = true;
+    lz4_size = uint64_t(lz4_hint);
+    name.resize(name.size() - kLz4BlocksSuffix.size());
+  } else if (lz4_hint == kLz4Unknown && file_info.type == rex::filesystem::FileInfo::Type::kFile &&
+             HasLz4BlocksSuffix(name)) {
     std::filesystem::path plain = full_path;
     plain.replace_extension();
     rex::filesystem::FileInfo plain_info;
@@ -167,6 +175,7 @@ HostPathEntry* HostPathEntry::Create(Device* device, Entry* parent,
   auto path = rex::string::utf8_join_guest_paths(parent->path(), name);
   auto entry = new HostPathEntry(device, parent, path, full_path);
   entry->lz4_blocks_ = lz4_blocks;
+  entry->disk_size_ = disk_size;
   if (lz4_blocks) {
     file_info.total_size = size_t(lz4_size);
   }

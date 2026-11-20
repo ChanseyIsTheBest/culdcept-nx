@@ -27,14 +27,20 @@ class HostPathEntry : public Entry {
                 const std::filesystem::path& host_path);
   ~HostPathEntry() override;
 
+  // culdcept-nx (2026-11-20): `lz4_hint` from the VFS index: kLz4Unknown (check the name: a plain NAME beside it, the
+  // .lz4b header), kLz4NotPacked, or the size of the file a NAME.lz4b holds (no SD access: the index knows it).
+  static constexpr int64_t kLz4Unknown = -2, kLz4NotPacked = -1;
   static HostPathEntry* Create(Device* device, Entry* parent,
                                const std::filesystem::path& full_path,
-                               rex::filesystem::FileInfo file_info);
+                               rex::filesystem::FileInfo file_info, int64_t lz4_hint = kLz4Unknown);
 
   const std::filesystem::path& host_path() const { return host_path_; }
   // rr6-nx (2026-11-10): host_path_ is an LZ4 block file (NAME.lz4b, rex/filesystem/lz4_blocks.h) shown as NAME with
   // the size of the file it holds; opened through OpenLz4Blocks, never mapped or written.
   bool lz4_blocks() const { return lz4_blocks_; }
+  // culdcept-nx (2026-11-20): the size of the file on the SD (a NAME.lz4b's own size, not the size it holds), which the
+  // VFS index compares with the SD's listing.
+  uint64_t disk_size() const { return disk_size_; }
 
   /*
    * "All the children of this directory are already known."
@@ -88,6 +94,7 @@ class HostPathEntry : public Entry {
   std::filesystem::path host_path_;
   bool children_complete_ = false;
   bool lz4_blocks_ = false;
+  uint64_t disk_size_ = 0;
 };
 
 }  // namespace rex::filesystem
