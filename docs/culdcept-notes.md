@@ -632,3 +632,41 @@ Done:
      for real: the decoder's refill has an indirect call). With only hand.txt and the bulk lines, the first codegen made
      neither native's call (no `n_<id>::Native` in app/generated/hot); both are listed in localized.txt now, as
      Katamari's were.
+
+## The board stutter, profiled again on the console with rc6 (2026-11-20 13:56-14:04, the user: "yeah you can use the console to record a profiled run just use the repla feature to play my existing run please")
+
+The same as prof1: the user's replay (main menu -> Replay, the replay of 2026-11-19 07:03), `configs/renut_profile_slow.toml`
+(identical to prof1's toml), handheld, started with sys-botbase, the replay played 4 min 34 s, closed from the Home menu,
+the shipped toml put back (out/console_runs/prof2; named with rc6's ELF, the build's own, md5 cf397d82...).
+The card's `banjo_profiler.log` is appended to, not replaced: prof2's copy starts with prof1's whole log, so the run's
+part is `banjo_profiler_run.log` (13 reports); `rex_profile.log` is replaced each run.
+
+**Not like for like: the memory clock.** prof1 ran at CPU 1020 / GPU 460.8 / memory 1600 MHz, prof2 at 1020 / 460.8 /
+**2733** MHz (the rex_profile.log clock line, every window). Nothing here changed a clock; it was set on the console
+between the runs. The GPU's time a board frame fell 5.49 -> 5.02 ms, and none of the changes touch the GPU, so part of
+what follows is the faster memory. The counts of file-system requests do not depend on it.
+
+| The replay's 9 report windows | prof1 (the FFmpeg build of 2026-11-19 23:37, memory 1600) | prof2 (rc6, memory 2733) |
+|---|---|---|
+| Frames of 40 ms or more of game-thread work | 313 of 15,374 | 263 of 15,631 (-16 %) |
+| Time in them | 24.1 s | 17.9 s (-25 %) |
+| The longest | 430 ms | 394 ms |
+| Board / battle windows: mean fps, 1 % low median | 58.3, 9.7 | 59.3, 12.1 |
+| Main thread in file-system requests (whole run) | 1,972 samples | 856 (-57 %) |
+| ... of them in the stutter frames | 2,091 of 11,498 (18 %) | 1,093 of 8,576 (13 %) |
+| The JPEG IDCT (whole run) | 1,212 | 839 (-31 %) |
+| The JPEG Huffman decode (whole run) | 1,441 (without its refill's own samples) | 1,331 |
+| The small-block free sub_82374F48 (whole run) | 9,321 | 7,803 |
+| The JPEG chain's share of the stutter frames | ~23 % | ~23 % |
+
+- **The file cache on the console**: 878 opens took a parked handle, 1,211 closes parked theirs, 302 were closed beyond the
+  cap of 32 (the game rotates through more files), 194 size queries without a stat; **0 failed opens** (the retry of
+  507786a3 never ran: 32 parked handles stay inside the console's limit).
+- **What file time is left** in the stutter frames: opens made by `VirtualFileSystem::ResolvePath` itself (5.7 %, and
+  its timestamp query 1.4 %: the path lookup opens the file before HostPathEntry::Open, which the cache does not cover),
+  reads (2.8 %) and closes of handles pushed out past the cap (2.0 %). The next levers: the path lookup answered without an
+  open on a read-only device, and a larger cap.
+- **The JPEG natives** on the console: the IDCT a third cheaper; the Huffman decode about the same as the machine copy's
+  (its time is the bit reader's loads and branches either way). The chain stays about a fifth of the stutter frames.
+- No crash, no error in the log; at the end the replay was still playing on the board (t7.jpg), the creatures, tiles and
+  numbers drawn clean.

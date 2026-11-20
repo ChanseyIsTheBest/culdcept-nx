@@ -44,14 +44,15 @@ and replays). Details and evidence: `docs/culdcept-notes.md`; the timeline: `doc
     - the game's data files kept open (`filesystem_keep_open`, handoffs 12 and 18): on the PC's board replay 595
       reopens in 300 s took a parked handle (no file-system request), in Ryujinx 713 in 700 s; an open that fails
       while handles are parked closes them and tries again (the console's limit on open files is not measured);
-      the console's share: PENDING (the next profile);
+      on the console (prof2, the user's replay, 2026-11-20 14:00) 878 reopens took a parked handle and the main
+      thread's file-system requests fell 57 % (0 failed opens: the retry never ran);
     - machine copies of every function in the console profile that had none (102 -> 256), the decoder chain among them;
     - hand-written natives: the JPEG inverse DCT (`culdcept_hand_idct`, NEON lanes) and the Huffman decoder
       (`culdcept_hand_huffman`, the bit reader in registers); both bit-exact in unit tests (200,000 blocks; 44,924
       MCUs); on the PC the IDCT compared with the original on every call (604,800, 0 differences) and the Huffman
       decoder by its own check (600,000 MCUs, 0 differences); in Ryujinx (rc6's NRO, the route to the first battle,
       700 s) the Huffman decoder's own check 16,384 MCUs, 0 differences, and the hand's card art clean (the IDCT's
-      NEON path); PENDING: the console;
+      NEON path); on the console (prof2) the IDCT a third cheaper, the Huffman decode about as the machine copy;
     - not given a native, and why: the small-block free (its time is a list walk a native cannot shorten), the colour
       conversion (a native would make the same table lookups), the wait (time spent waiting for a file).
 
@@ -102,8 +103,11 @@ after the fix.
 
 ## What is next (the console steps: `docs/console-testing.md`)
 
-1. PENDING: the user's replay on the console with tonight's NRO, the same profile as prof1, to see what the stutter
-   frames hold now.
+1. Done 2026-11-20 13:56-14:04 (prof2, the user's replay with rc6): frames of 40 ms or more 313 -> 263 in the replay,
+   time in them 24.1 -> 17.9 s, the board's 1 % lows 9.7 -> 12.1 fps; not like for like: the console's memory clock
+   was 1600 MHz in prof1 and 2733 MHz in prof2 (not changed by this session). Left in the stutter frames: the JPEG chain
+   (~23 %), the small-block free (~10 %), opens made by the path lookup (~7 %). Next levers: the path lookup without an
+   open on a read-only device, a larger file-cache cap (`docs/culdcept-notes.md`, the last section).
 2. PGO + LTO (not this session): `configs/renut_pgo.toml` is the training toml (docs/building.md).
 
 ## For your decision
