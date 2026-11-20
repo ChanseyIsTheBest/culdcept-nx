@@ -31,7 +31,8 @@ It is built on [renut_nx_ultimate_base](docs/base-readme.md), which carries the 
    - the music and sound effects re-encoded to Opus, the music at 128 kbit/s (the voices stay as they are).
 3. Extract the downloaded `culdcept-nx.zip` to the root of the SD card: it makes `switch/culdcept-nx/`.
 4. In Sphaira, find the game, press X for Options and choose **Install Forwarder**. Set **Address Space** to **39-bit**,
-   choose Create Forwarder, then start the game from the Home screen.
+   choose Create Forwarder, then start the game from the Home screen. A forwarder made from an earlier version keeps
+   that version's icon: make it again to get the new one.
 
 ```text
 /switch/culdcept-nx/
