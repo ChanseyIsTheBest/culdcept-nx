@@ -767,4 +767,16 @@ frame-threaded hook. Every movie stays H.265 (the user: "Lets do h.265 for all t
   Opus at offset 0 (65-79 dB against ffmpeg's newer libopus); bgm_01_01's loop jumps back exactly 5,855 frames to
   frame 745 and matches from there.
 - **Costs**: the first start after an install reads each .xmo's header for the index (Ryujinx: the full scan 39.6 s
-  against 10.8 s); later starts use the index (237 ms).
+  against 10.8 s; the console 22.8 s); later starts use the index (237 ms). The XMA worker thread on the console: 1.96 %
+  of a core against 1.80 % with XMA over the replay's first 5 minutes (481 against 388 us a context), the worst
+  context 4.75 ms (a loop's 320 ms pre-roll; the worker's, not the game thread's).
+- **On the console** (2026-11-20 21:07-21:14, out/console_runs/xmo_c1; the .xmo files put in game_root/data/SOUND,
+  the XMA files set aside, this build's NRO, the user's replay): 25 sounds from Opus, no [xmo] warning, no error; the
+  title music's data read 11 ms (52 ms as XMA). Then everything put back: the XMA files, the user's rc6 NRO, the
+  untouched culdcept.toml; the .xmo files left in /switch/culdcept-nx/xmo_test and the test NRO as
+  culdcept-nx_opus_test.nro (the FTP tool deletes nothing).
+- **The installer** (culdcept-nx-installer): the full test in Chrome made the zip with every movie in H.265 and 634 sound
+  files as .xmo (290.2 -> 171.2 MB), 2,576 MB in all, checked by test/check_zip.py and six .xmo by out/test_xmo.exe.
+  Its first full run kept 34 movies as WMV and 63 sounds as XMA: the worker pool posts a busy worker its next job, and
+  the movie and audio workers' handlers awaited the encoder, so a second job reopened the one WebAssembly decoder under
+  the first (each worker now takes its jobs one at a time).
