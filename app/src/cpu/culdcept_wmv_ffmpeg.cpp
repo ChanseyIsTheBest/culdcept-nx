@@ -39,6 +39,8 @@
 #include <vector>
 
 #if CULDCEPT_NXVIDEO
+#include <switch.h>  // svcGetThreadPriority / svcSetThreadPriority (culdcept_movie_decode_priority)
+
 #include "nxvideo.h"
 #endif
 
@@ -57,6 +59,34 @@ REXCVAR_DEFINE_INT32(culdcept_movie_nvdec, 1, "Culdcept",
                      "The movies on the Switch's hardware decoder (NVDEC, through nxvideo): 0 none (software), 1 the "
                      "H.265 movies the installer made, 2 the game's WMV3 movies too")
     .range(0, 2);
+// 2026-11-20 (the user on the console: "audio doesn't play during the video and the video has major stutters"): the
+// H.265 narrations decoded at 21-25 ms a frame in the game (60 fps needs 16.7) where the console's benchmark, alone,
+// took 4.5 ms on NVDEC. The decode waits on the hardware, on the game's thread at its priority (0x3B, the lowest):
+// woken, it waits for a core behind the game's other threads, which Horizon does not time-slice. nxv_decode runs at
+// this priority (above the game's threads) and the thread's own is put back after.
+REXCVAR_DEFINE_INT32(culdcept_movie_decode_priority, 0x2C, "Culdcept",
+                     "The thread's priority while it waits for an H.265 frame on NVDEC (0x1C-0x3B, lower runs first; "
+                     "the game's threads 0x3B, the audio threads 0x2A-0x2D); 0 = the thread's own")
+    .range(0, 0x3B);
+// 2026-11-20: nvtegra's DFS sets NVDEC's clock to the rate frames come at, and the game asks for a frame only after the
+// last is shown: the clock fell until a frame took a whole display frame (tools/switch/nxvideo/nxvideo.c).
+REXCVAR_DEFINE_BOOL(culdcept_movie_max_clock, true, "Culdcept",
+                    "While an H.265 movie plays on NVDEC: NVDEC at the clock nvtegra's DFS starts from (its maximum) "
+                    "and the VIC at its maximum. false: DFS's own clock (it slows the movies down in this game)");
+// 2026-11-21 (the user on the console: "audio plays during video properly now but video drops frames"): 19.5 ms a
+// frame in the narrations, 18 of it copying the picture out of NVDEC's surface: FFmpeg's nvtegra did it with the CPU
+// (its fallback for a picture that is not 256-byte aligned). nxvideo now gives it an aligned picture of its own, which
+// the VIC fills (tools/switch/nxvideo/nxvideo.c).
+REXCVAR_DEFINE_BOOL(culdcept_movie_vic_copy, true, "Culdcept",
+                    "H.265 movies on NVDEC: the picture copied out of NVDEC's surface by the VIC into an aligned NV12 "
+                    "picture, the same bytes as the CPU's copy (false: FFmpeg's own picture, copied by the CPU: 18 ms a "
+                    "frame in the game)");
+REXCVAR_DEFINE_BOOL(culdcept_movie_verify, false, "Culdcept",
+                    "H.265 movies on NVDEC: every 30th VIC picture compared with FFmpeg's CPU copy of it (the log's "
+                    "nxvideo line; each comparison costs a CPU copy, about 18 ms: a test, not for playing)");
+REXCVAR_DEFINE_STRING(culdcept_movie_verify_dump, "", "Culdcept",
+                      "With culdcept_movie_verify: a folder the first compared pair of pictures is written to "
+                      "(I420), e.g. sdmc:/switch/culdcept-nx/logs");
 
 REX_EXTERN(__imp__sub_8259EE00);  // decode (C, u32* pcb)
 REX_EXTERN(__imp__sub_8259EE60);  // get output (C, buf, size, u32* pcb, u32*, u64* pts, u32* flag)
@@ -117,6 +147,7 @@ struct Movie {
   std::vector<uint8_t> captured;   // mode 2: what the guest's decoder took
   uint64_t frames = 0, decoded = 0, failed = 0, damaged = 0, compared = 0;
   double decode_ms = 0.0, copy_ms = 0.0;
+  double nxv_ms = 0.0;  // of decode_ms, in nxv_decode (2026-11-20)
   uint64_t timed = 0;
   std::chrono::steady_clock::time_point since{};
   uint32_t width = 0, height = 0;
@@ -228,6 +259,8 @@ bool NxvDecode(Movie &m, const uint8_t *base, uint32_t v, const std::vector<uint
       const uint32_t seq = Ld32(base, v + kSequence), seq_len = Ld16(base, v + kSequenceLen);
       const bool wmv3 = !m.hevc;
       char why[160] = {};
+      nxv_options(REXCVAR_GET(culdcept_movie_max_clock) ? 1 : 0, REXCVAR_GET(culdcept_movie_vic_copy) ? 1 : 0,
+                  REXCVAR_GET(culdcept_movie_verify) ? 1 : 0, REXCVAR_GET(culdcept_movie_verify_dump).c_str());
       m.nxv = nxv_open(m.hevc ? NXV_HEVC : NXV_WMV3, wmv3 && seq && seq_len < 64 ? base + seq : nullptr,
                        wmv3 ? int(seq_len) : 0, int(m.width), int(m.height), m.hevc ? nvdec >= 1 : 1, why, sizeof(why));
       REXLOG_INFO("[wmv] {}: {}", m.hevc ? "an H.265 movie" : "a WMV3 movie on nxvideo", m.nxv ? why : "did not open");
@@ -243,7 +276,15 @@ bool NxvDecode(Movie &m, const uint8_t *base, uint32_t v, const std::vector<uint
   if (!m.nxv_used)
     return false;
 #if CULDCEPT_NXVIDEO
+  const int boost = REXCVAR_GET(culdcept_movie_decode_priority);
+  s32 own = 0;
+  const bool raised = boost > 0 && R_SUCCEEDED(svcGetThreadPriority(&own, CUR_THREAD_HANDLE)) && own > boost &&
+                      R_SUCCEEDED(svcSetThreadPriority(CUR_THREAD_HANDLE, u32(boost)));
+  const auto t0 = std::chrono::steady_clock::now();
   const int r = m.nxv ? nxv_decode(m.nxv, bytes.data(), int(bytes.size()), &m.pic) : -1;
+  m.nxv_ms += std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - t0).count();
+  if (raised)
+    svcSetThreadPriority(CUR_THREAD_HANDLE, u32(own));
   m.have = r == 1;
 #else
   m.have = false;
@@ -345,6 +386,26 @@ void WriteI420Nxv(const NxvPicture &p, uint8_t *base, uint32_t buf, uint32_t w, 
 }
 #endif
 
+#if CULDCEPT_NXVIDEO
+// nxvideo's times since its last line (then cleared): every 10 s and at the movie's close (2026-11-21: the intros are
+// shorter than 10 s).
+void NxvLine(Movie &m, uint32_t c) {
+  if (!m.nxv) return;
+  NxvStats st;
+  nxv_stats(m.nxv, &st);
+  if (!st.frames) return;
+  const double n = double(st.frames);
+  REXLOG_INFO("[wmv] {:08X}: nxvideo a frame ({}): send {:.2f} ms, receive {:.2f} ms, transfer {:.2f} ms; NVDEC {} MHz "
+              "(DFS's start {} MHz, put back {} times), VIC {} MHz; copied out by the VIC {}, by the CPU {}{}",
+              c, st.frames, st.send_ms / n, st.receive_ms / n, st.transfer_ms / n, st.nvdec_hz / 1000000,
+              st.nvdec_max_hz / 1000000, st.restores, st.vic_hz / 1000000, st.vic_frames, st.cpu_frames,
+              st.checked ? fmt::format("; verify: {} pictures compared with the CPU's copy, {} {} ({} samples)",
+                                       st.checked, st.checked_differ, st.checked_differ ? "DIFFERENT" : "different",
+                                       st.checked_samples)
+                         : std::string());
+}
+#endif
+
 void TimeLine(Movie &m, uint32_t c, double decode_ms, double copy_ms) {
   const auto now = std::chrono::steady_clock::now();
   m.decode_ms += decode_ms;
@@ -353,11 +414,15 @@ void TimeLine(Movie &m, uint32_t c, double decode_ms, double copy_ms) {
   if (m.since.time_since_epoch().count() == 0)
     m.since = now;
   if (now - m.since >= std::chrono::seconds(10)) {
-    REXLOG_INFO("[wmv] {:08X}: {} frames by FFmpeg in {:.1f} s ({}x{}): {:.2f} ms decoding and {:.2f} ms copying a "
-                "frame; {} decoded, {} not, {} damaged so far",
+    REXLOG_INFO("[wmv] {:08X}: {} frames by FFmpeg in {:.1f} s ({}x{}): {:.2f} ms decoding ({:.2f} of it in nxvideo) "
+                "and {:.2f} ms copying a frame; {} decoded, {} not, {} damaged so far",
                 c, m.timed, std::chrono::duration<double>(now - m.since).count(), m.width, m.height,
-                m.decode_ms / double(m.timed), m.copy_ms / double(m.timed), m.decoded, m.failed, m.damaged);
-    m.decode_ms = m.copy_ms = 0.0;
+                m.decode_ms / double(m.timed), m.nxv_ms / double(m.timed), m.copy_ms / double(m.timed), m.decoded,
+                m.failed, m.damaged);
+    m.decode_ms = m.copy_ms = m.nxv_ms = 0.0;
+#if CULDCEPT_NXVIDEO
+    NxvLine(m, c);
+#endif
     m.timed = 0;
     m.since = now;
   }
@@ -528,6 +593,9 @@ REX_HOOK_RAW(sub_8259ED50) {
 #endif
       REXLOG_INFO("[wmv] {:08X}: movie closed{}: {} frames, {} decoded by {}, {} not, {} damaged", c,
                   m.hevc ? " (H.265)" : "", m.frames, m.decoded, by, m.failed, m.damaged);
+#if CULDCEPT_NXVIDEO
+      NxvLine(m, c);
+#endif
     }
     CloseDecoder(m);
     m.frames = m.decoded = m.failed = m.damaged = m.compared = 0;

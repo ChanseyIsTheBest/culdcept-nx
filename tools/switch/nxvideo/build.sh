@@ -24,7 +24,7 @@ FLAGS="-O2 -ffunction-sections -fdata-sections -march=armv8-a+crc+crypto -mtune=
 "$BIN/aarch64-none-elf-ld" -r -o "$OUT/nxvideo_full.o" "$OUT/shim.o" \
   --start-group "$PL/lib/libavcodec.a" "$PL/lib/libavutil.a" --end-group
 
-API="nxv_open nxv_decode nxv_flush nxv_close nxv_is_hw nxv_version"
+API="nxv_open nxv_decode nxv_flush nxv_close nxv_is_hw nxv_version nxv_stats nxv_options"
 KEEP=()
 for s in $API; do KEEP+=(--keep-global-symbol="$s"); done
 "$BIN/aarch64-none-elf-objcopy" "${KEEP[@]}" "$OUT/nxvideo_full.o" "$OUT/nxvideo.o"

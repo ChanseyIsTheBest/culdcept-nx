@@ -36,6 +36,22 @@ NxvDecoder *nxv_open(int codec, const uint8_t *extradata, int extradata_size, in
 int nxv_decode(NxvDecoder *d, const uint8_t *data, int size, NxvPicture *out);
 void nxv_flush(NxvDecoder *d);
 void nxv_close(NxvDecoder *d);
+// 2026-11-20: the time in each step since the last call (then cleared) and the clocks.
+// 2026-11-21: vic_frames / cpu_frames, the pictures copied out of NVDEC's surface by the VIC into the decoder's own
+// aligned picture, and by FFmpeg's CPU fallback (since the decoder opened); checked*, verify's comparisons of the VIC's
+// picture with the CPU's (frames compared, of them different, samples different; since the decoder opened).
+typedef struct NxvStats {
+  uint64_t frames, restores, vic_frames, cpu_frames, checked, checked_differ, checked_samples;
+  double send_ms, receive_ms, transfer_ms;  // totals over `frames`
+  uint32_t nvdec_hz, nvdec_max_hz, vic_hz;
+} NxvStats;
+void nxv_stats(NxvDecoder *d, NxvStats *out);
+// keep_max_clock (default 1): NVDEC at the clock nvtegra's DFS starts from, and the VIC at its maximum. vic_copy
+// (default 1): the picture copied out by the VIC into an aligned NV12 picture of the decoder's own (0: FFmpeg's own
+// picture, which it copies with the CPU). verify (default 0): every 30th VIC picture compared with FFmpeg's CPU copy
+// of it (NxvStats.checked*); dump_dir (verify; NULL or "" for none): the first compared pair with something in the
+// picture written there as I420 files (nxv_cpu_WxH.yuv, nxv_vic_WxH.yuv).
+void nxv_options(int keep_max_clock, int vic_copy, int verify, const char *dump_dir);
 // 1 while the decoder decodes on NVDEC.
 int nxv_is_hw(const NxvDecoder *d);
 // "FFmpeg 7.1, libavcodec 61.19.100"

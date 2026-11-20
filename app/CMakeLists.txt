@@ -889,7 +889,7 @@ if(REXGLUE_PLATFORM_SWITCH)
         set(_nxv_out "${CMAKE_CURRENT_BINARY_DIR}/nxvideo")
         file(MAKE_DIRECTORY "${_nxv_out}")
         set(_nxv_keep)
-        foreach(_s nxv_open nxv_decode nxv_flush nxv_close nxv_is_hw nxv_version)
+        foreach(_s nxv_open nxv_decode nxv_flush nxv_close nxv_is_hw nxv_version nxv_stats nxv_options)
             list(APPEND _nxv_keep "--keep-global-symbol=${_s}")
         endforeach()
         add_custom_command(OUTPUT "${_nxv_out}/nxvideo.o"

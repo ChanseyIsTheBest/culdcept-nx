@@ -26,7 +26,10 @@ page checks it, downloads this program, and writes the game folder about 4.7 GB 
   board holds about 60 fps on average (59-60 a 10 s window), with short drops when the game loads its data (1 % lows
   12-16 fps), as in rc6. The audio worker takes 1.96 % of a core (1.80 % with XMA).
 - **H.265 movies on the console** (a benchmark of the credits, all 6,470 frames): 4.6 ms a frame on NVDEC, the worst
-  9.3 ms, none late. AV1 was measured and not used (the browser's AV1 is larger than H.265 for the same picture, and
+  9.3 ms, none late. In the game (2026-11-21): a 60 fps narration at 600 frames every 10 s, 2.6 ms a frame (the picture
+  copied out of NVDEC by the VIC, the same bytes as FFmpeg's CPU copy, which took 18 ms), with its sound; the
+  installer's movies keep each audio object whole, as the originals do (the first test files played slowly and
+  without sound). AV1 was measured and not used (the browser's AV1 is larger than H.265 for the same picture, and
   the smaller SVT-AV1 file stutters on the console's CPU).
 - **The installer** (Chrome, the full test): every movie in H.265, 634 sound files in Opus, a 2,576 MB zip in 545 s,
   every file checked against the game folder.

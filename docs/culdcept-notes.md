@@ -742,6 +742,51 @@ port's movie hook takes them); the browser's AV1 on two threads 12.2 ms, none la
 worst, none late. The only AV1 that saves space (~19 MB, SVT-AV1) cannot be made in a browser and stutters without a
 frame-threaded hook. Every movie stays H.265 (the user: "Lets do h.265 for all the videos").
 
+## The H.265 movies on the console: slow, silent, then dropping frames (2026-11-20 night - 11-21, the user: "audio doesn't play during the video and the video has major stutters", "can you spend 12 hours independelty to get video decoding and video playback audio on h.265 working properly")
+
+- **Slow and silent: the remux.** The intros in H.265 played slowly and without sound, in Ryujinx too (which decodes no
+  H.265): the file, not the decoder. On the PC, the original CI_01 written again through the installer's lib/asf.js
+  with its own frames (nothing re-encoded) played in 11.3 s instead of 6.8. The originals' muxer never splits an audio
+  object across packets; the writer did (5 of CI_01's 19), and the game's player lost a split object's sound and paced
+  the movie slower. It also gave each packet its first object's send time and a duration of 0. Now (lib/asf.js and
+  tools/hevc_movie.py, byte for byte the same: test/movies_node.mjs on CI_01 and narration_01): each audio object whole
+  in one packet (one that does not fit waits for the next packet, which it starts, and the video goes on filling the
+  packet before: a new packet for each made the narrations 10 % larger), each packet's send time the original time of
+  the bytes it starts with (for a re-encoded frame, of the same fraction of the original's bytes), never earlier than
+  the packet before's, and its duration the time to the next. PC: the intros 5.78 / 6.76 / 3.41 s (the originals'
+  5.8 / 6.8 / 3.4); the console with the 33 movies written again: CI_00 5.79 s, CI_01 6.77 s, CI_02 3.42 s, every frame
+  on NVDEC, and the user: "audio plays during video properly now".
+- **Dropping frames at 60 fps: the picture's copy.** The narrations (60 fps) then took 19.5 ms a frame in the game
+  (out/console_logs/renut_023.log, 10 s windows): send 1.3 ms (FFmpeg waits for NVDEC's decode inside it, at 979 MHz),
+  receive 0, and 18 ms copying the picture out of NVDEC's block-linear surface (av_hwframe_transfer_data). FFmpeg's
+  nvtegra (libavutil's hwcontext_nvtegra.o, read in its disassembly) copies with the VIC only into a picture whose
+  planes and pitches are 256-byte aligned; FFmpeg's own picture is not, so every frame took its CPU fallback ("Frame
+  address/pitch not aligned to 256, falling back to cpu transfer"): the surface's lines cleaned and invalidated, then
+  un-tiled by the CPU, 16 bytes at a time, on the game's busy cores. nxvideo now gives it a picture of its own: NV12
+  (the surface's format), planes and pitches 256-aligned, in whole pages of its own (nvtegra maps it for the VIC each
+  frame), invalidated again after the VIC writes it. The intros on the console (renut_025/026): the copy 1.4-1.9 ms a
+  frame instead of 18 (send 1.2, so about 3 ms in all against the 16.7 of a 60 fps frame). The VIC's NV12 picture is
+  the CPU fallback's byte for byte; nvtegra's YUV420P copy (which would have spared the player's chroma split) is not:
+  its U plane comes out 255 everywhere (out of the three pictures dumped by the verify, tmp_hevc/vicdump). The verify
+  on the three intros (every 30th frame, 17 pictures, one dumped with a logo in it): 0 samples differ. A 60 fps
+  movie on the console (narration_01 put in CI_00's place for one start, out/console_logs/renut_029.log): 600 frames
+  every 10 s (576 in the first window), 2.6 ms a frame in nxvideo (send 1.2, copy 1.4) and 0.5 ms in the player's
+  copy, against 447-475 frames and 19.5 ms before. The intros' own audio is silence (-91 dB in the originals); three
+  captures of a start (out/console_runs/startup_c1) are digital silence until the title music: the "loud stutter
+  noise" at the start was most likely the first writer's split audio objects (half objects fed to the WMA decoder).
+  Cvars:
+  `culdcept_movie_vic_copy` (true; false is FFmpeg's CPU copy), `culdcept_movie_verify` (false; true compares every
+  30th VIC picture with the CPU fallback's copy and logs the count that differ) and `culdcept_movie_verify_dump` (a
+  folder for the first compared pair with something in the picture).
+- **The clocks and the thread.** nvtegra's DFS sets NVDEC's clock every 20 frames to the bitrate it saw over wall time
+  x 1.2, and the game asks for a frame only after showing the last: the clock fell until a frame took a display frame.
+  nxvideo keeps NVDEC at the clock DFS starts from (its maximum, 979 MHz; put back about twice a second in a narration)
+  and sets the VIC to its maximum, which nvtegra never sets (`culdcept_movie_max_clock`). nxv_decode runs at priority
+  0x2C, above the game's threads (0x3B), and the thread's own is put back after (`culdcept_movie_decode_priority`).
+- **Moonlight-Switch** (its source, read with the user's permission): it never copies the picture out; FFmpeg's NVTEGRA
+  frames are drawn by deko3d straight from NVDEC's surface (DKVideoRenderer), and it sets no clock. The game's player
+  wants the picture in its own I420 buffer, which it uploads itself, so this port copies it out, now with the VIC.
+
 ## The music and effects in Opus (2026-11-20, the user: "Yeah I think I want to rencode the audio the to opus", "Lets go with 128k", "go ahead with the opus audio work work nonstop until its done")
 
 - **What the installer makes**: NAME.xmo for each 48 kHz XMA file in data/SOUND (`sdk/include/rex/filesystem/xmo.h`
