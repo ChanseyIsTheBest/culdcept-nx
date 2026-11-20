@@ -670,3 +670,29 @@ what follows is the faster memory. The counts of file-system requests do not dep
   (its time is the bit reader's loads and branches either way). The chain stays about a fifth of the stutter frames.
 - No crash, no error in the log; at the end the replay was still playing on the board (t7.jpg), the creatures, tiles and
   numbers drawn clean.
+
+### The rerun at last night's clocks (prof3, 2026-11-20 14:17-14:26, the user: "can you rerun it I set clocks correctly")
+
+The same steps; the rex_profile.log clock line in every window: CPU 1020 / GPU 460.8 / memory 1600 MHz, as in prof1. The
+user's clock overlay was on screen this time (a small cost prof1 did not have). Banjo's session confirmed no FTP upload of
+its own ran during the run.
+
+| The replay's 9 report windows | prof1 (2026-11-19 23:37 build) | prof3 (rc6) |
+|---|---|---|
+| Frames of 40 ms or more of game-thread work | 313 of 15,374 | 260 of 15,590 (-17 %) |
+| Time in them | 24.1 s | 17.7 s (-26 %) |
+| The longest | 430 ms | 409 ms |
+| Board / battle windows: mean fps, 1 % low median | 58.3, 9.7 | 59.2, 12.1 |
+| GPU a board frame; the render thread | 5.49 ms; 4.00 ms | 5.47 ms; 4.07 ms |
+| Main thread in file-system requests (whole run) | 1,972 samples | 889 (-55 %) |
+| ... in the stutter frames | 2,091 of 11,498 (18 %) | 1,008 of 8,554 (12 %) |
+| The JPEG IDCT (whole run) | 1,212 | 806 (-33 %) |
+| The JPEG Huffman decode (whole run) | 1,441 | 1,243 (-14 %) |
+| Opens slower than the log's threshold | 148 | 89 |
+
+- **So prof2's gains were not the memory clock**: at the same clocks the stutter numbers are prof2's within a few
+  frames; the GPU's 5.0 ms in prof2 was the faster memory (5.47 ms here, as prof1).
+- The file cache: 877 opens took a parked handle, 302 closed beyond the cap, 0 failed opens.
+- The stutter frames now: file-system requests 12 %, the Huffman native 11 %, the small-block free 10 %, the loader wait
+  8 %, the IDCT native 4 %, the colour conversion 4 %, the game's JPEG caller 3 %.
+- No crash, no error in the log.
