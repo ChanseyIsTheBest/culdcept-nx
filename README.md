@@ -117,7 +117,7 @@ session), worked on in [docs/culdcept-notes.md](docs/culdcept-notes.md).
   written or parsed and no EDRAM is modelled. The game's seven shaders are built into the NRO.
 - **Smaller game files, read as they were.** The packed files (LZ4 and ZXC in blocks) are decompressed as the game reads
   them. A movie in H.265 is decoded by the Switch's video hardware (NVDEC, through FFmpeg's nvtegra backend) in place of
-  the game's WMV decoder. A sound in Opus (`NAME.xma.xmo`) is shown to the game as its XMA file, frame for frame, and
+  the game's WMV decoder, and each picture is copied out for the game's player by the VIC (about 3 ms a frame). A sound in Opus (`NAME.xma.xmo`) is shown to the game as its XMA file, frame for frame, and
   each frame's samples come from the Opus stream: loops and timing stay the game's own.
 
 ## Documentation
