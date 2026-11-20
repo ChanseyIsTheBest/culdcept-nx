@@ -6,8 +6,11 @@
 //   H.265 by FFmpeg 7.1 (devkitPro's switch-ffmpeg) in software, one thread;
 //   H.265 on NVDEC through nvtegra (the port's nxvideo path), each picture copied back to memory.
 // Every picture is also copied into a 1280x720 I420 buffer, as the hook copies it into the game's. The CPU clock is
-// read, never set. Input: sdmc:/switch/culdcept-nx/av1bench/clip.ivf (AV1) and clip.hevc (H.265, Annex B); results in
-// results.txt there and on screen. Built by tools/switch/av1bench/build.sh.
+// read, never set. Input: sdmc:/switch/culdcept-nx/av1bench_clip.ivf (AV1) and av1bench_clip.hevc (H.265, Annex B);
+// results in av1bench_results.txt there and on screen. Built by tools/switch/av1bench/build.sh.
+// 2026-11-20 (the user: "check which movies are 30 fps and test AV1 on those"): the clips are a table, each with its
+// frame budget (the 30 fps ones: credit_us and CI_01, 33.3 ms); a clip whose files are missing is skipped. Each line
+// also gives the 99th percentile and the frames over twice the budget.
 #include <switch.h>
 
 #include <stdarg.h>
@@ -51,20 +54,35 @@ static uint8_t *load(const char *path, size_t *size) {
 
 typedef struct { const uint8_t *data; int size; } Packet;
 
-typedef struct { int frames; double total, worst, over; } Stats;
+#define MAX_FRAMES 8192
+static double g_budget = 16.67;  // ms a frame: the clip's (Clip.budget)
+typedef struct { int frames; double total, worst, over, over2; double ms[MAX_FRAMES]; } Stats;
+static Stats g_stats;
 
 static void note(Stats *s, double ms) {
+  if (s->frames < MAX_FRAMES) s->ms[s->frames] = ms;
   s->frames++;
   s->total += ms;
   if (ms > s->worst) s->worst = ms;
-  if (ms > 16.67) s->over++;
+  if (ms > g_budget) s->over++;
+  if (ms > 2 * g_budget) s->over2++;
 }
 
-static void report(const char *name, const Stats *s, double wall) {
+static int cmp_double(const void *a, const void *b) {
+  const double x = *(const double *)a, y = *(const double *)b;
+  return x < y ? -1 : x > y;
+}
+
+static void report(const char *name, Stats *s, double wall) {
   if (!s->frames) { say("%-34s no pictures", name); return; }
   const double avg = s->total / s->frames;
-  say("%-34s %4d pictures: %6.2f ms avg, %6.2f worst, %3.0f%% over 16.7 ms; %5.1f fps; %3.0f%% of a core at 60 fps",
-      name, s->frames, avg, s->worst, 100.0 * s->over / s->frames, s->frames / (wall / 1000.0), avg / 16.67 * 100.0);
+  const int n = s->frames < MAX_FRAMES ? s->frames : MAX_FRAMES;
+  qsort(s->ms, (size_t)n, sizeof(double), cmp_double);
+  const double p99 = s->ms[(int)(n * 0.99) < n ? (int)(n * 0.99) : n - 1];
+  say("%-34s %4d pictures: %6.2f ms avg, %6.2f p99, %6.2f worst, %4.1f%% over %.1f ms, %d over %.0f ms; %5.1f fps; "
+      "%3.0f%% of a core at %.0f fps",
+      name, s->frames, avg, p99, s->worst, 100.0 * s->over / s->frames, g_budget, (int)s->over2, 2 * g_budget,
+      s->frames / (wall / 1000.0), avg / g_budget * 100.0, 1000.0 / g_budget);
 }
 
 // I420 into the 1280x720 buffer, as the hook writes the game's.
@@ -116,7 +134,8 @@ static void bench_av1(const Packet *p, int n, int threads, int delay) {
   set.max_frame_delay = delay;
   Dav1dContext *c = NULL;
   if (dav1d_open(&c, &set) < 0) { say("dav1d did not open"); return; }
-  Stats s = {0};
+  Stats *s = &g_stats;
+  memset(s, 0, sizeof(*s));
   const double wall0 = now_ms();
   for (int k = 0; k < n; ++k) {
     Dav1dData data = {0};
@@ -125,7 +144,7 @@ static void bench_av1(const Packet *p, int n, int threads, int delay) {
     for (;;) {
       const int r = dav1d_send_data(c, &data);
       Dav1dPicture pic = {0};
-      if (dav1d_get_picture(c, &pic) == 0) av1_take(&pic, &s, t0);
+      if (dav1d_get_picture(c, &pic) == 0) av1_take(&pic, s, t0);
       if (r != DAV1D_ERR(EAGAIN)) break;
     }
   }
@@ -133,12 +152,12 @@ static void bench_av1(const Packet *p, int n, int threads, int delay) {
     Dav1dPicture pic = {0};
     const double t0 = now_ms();
     const int r = dav1d_get_picture(c, &pic);
-    if (r == 0) av1_take(&pic, &s, t0); else if (r != DAV1D_ERR(EAGAIN) || s.frames >= n) break;
+    if (r == 0) av1_take(&pic, s, t0); else if (r != DAV1D_ERR(EAGAIN) || s->frames >= n) break;
   }
   const double wall = now_ms() - wall0;
   char name[64];
   snprintf(name, sizeof(name), "AV1 dav1d %d thread%s%s", threads, threads > 1 ? "s" : "", delay > 1 ? ", frame-threaded" : "");
-  report(name, &s, wall);
+  report(name, s, wall);
   dav1d_close(&c);
 }
 
@@ -188,7 +207,8 @@ static void bench_hevc(const Packet *p, int n, int hw) {
   if (avcodec_open2(c, codec, NULL) < 0) { say("H.265 %s: the decoder did not open", hw ? "NVDEC" : "software"); return; }
   AVPacket *pkt = av_packet_alloc();
   AVFrame *f = av_frame_alloc(), *sw = av_frame_alloc();
-  Stats s = {0};
+  Stats *s = &g_stats;
+  memset(s, 0, sizeof(*s));
   int hw_frames = 0;
   const double wall0 = now_ms();
   for (int k = 0; k < n; ++k) {
@@ -207,14 +227,14 @@ static void bench_hevc(const Packet *p, int n, int hw) {
         uint8_t *d[3] = {pic->data[0], pic->data[1], pic->data[2]};
         ptrdiff_t st[3] = {pic->linesize[0], pic->linesize[1], pic->linesize[2]};
         copy_planes(d, st, pic->width, pic->height, pic->format == AV_PIX_FMT_NV12);
-        note(&s, now_ms() - t0);
+        note(s, now_ms() - t0);
       }
     }
     av_packet_unref(pkt);
   }
   const double wall = now_ms() - wall0;
   report(hw ? (hw_frames ? "H.265 NVDEC (nvtegra) + copy" : "H.265 NVDEC asked, software ran") : "H.265 FFmpeg software, 1 thread",
-         &s, wall);
+         s, wall);
   av_frame_free(&f);
   av_frame_free(&sw);
   av_packet_free(&pkt);
@@ -226,7 +246,7 @@ int main(int argc, char **argv) {
   consoleInit(NULL);
   out = fopen(DIR "results.txt", "w");
   i420 = malloc(1280 * 720 * 3 / 2);
-  say("culdcept-nx AV1 / H.265 decode benchmark (720p60, 20 s of narration_09)");
+  say("culdcept-nx AV1 / H.265 decode benchmark");
   u32 hz = 0;
   if (R_SUCCEEDED(clkrstInitialize())) {
     ClkrstSession sess;
@@ -235,21 +255,35 @@ int main(int argc, char **argv) {
   }
   say("CPU clock: %s%u MHz (read, not set); dav1d %s; %s", hz ? "" : "unknown ", hz / 1000000, dav1d_version(),
       av_version_info());
-  static Packet av1[4096], hevc[4096];
-  size_t n1 = 0, n2 = 0;
-  uint8_t *b1 = load(DIR "clip.ivf", &n1), *b2 = load(DIR "clip.hevc", &n2);
-  const int k1 = b1 ? ivf_packets(b1, n1, av1, 4096) : 0;
-  const int k2 = b2 ? annexb_packets(b2, n2, hevc, 4096) : 0;
-  say("AV1 %d frames (%.2f MB), H.265 %d frames (%.2f MB)", k1, n1 / 1048576.0, k2, n2 / 1048576.0);
-  if (k1) {
-    bench_av1(av1, k1, 1, 1);
-    bench_av1(av1, k1, 2, 1);
-    bench_av1(av1, k1, 3, 1);
-    bench_av1(av1, k1, 3, 3);
-  }
-  if (k2) {
-    bench_hevc(hevc, k2, 0);
-    bench_hevc(hevc, k2, 1);
+  // the clips: AV1 (IVF) and H.265 (Annex B) of the same picture, and the frame budget
+  static const struct { const char *name, *ivf, *hevc; double budget; } clips[] = {
+      {"credit_us (720p30, 3:36), AV1 by SVT-AV1", DIR "credit.ivf", DIR "credit.hevc", 1000.0 / 30},
+      {"credit_us, AV1 by libaom real-time (as a browser)", DIR "credit_rt.ivf", NULL, 1000.0 / 30},
+      {"CI_01 (720p30, 6.7 s)", DIR "ci01.ivf", DIR "ci01.hevc", 1000.0 / 30},
+  };
+  static Packet av1[MAX_FRAMES], hevc[MAX_FRAMES];
+  for (size_t c = 0; c < sizeof(clips) / sizeof(clips[0]); ++c) {
+    size_t n1 = 0, n2 = 0;
+    uint8_t *b1 = clips[c].ivf ? load(clips[c].ivf, &n1) : NULL, *b2 = clips[c].hevc ? load(clips[c].hevc, &n2) : NULL;
+    if (!b1 && !b2) continue;
+    const int k1 = b1 ? ivf_packets(b1, n1, av1, MAX_FRAMES) : 0;
+    const int k2 = b2 ? annexb_packets(b2, n2, hevc, MAX_FRAMES) : 0;
+    g_budget = clips[c].budget;
+    say("");
+    say("%s: AV1 %d frames (%.2f MB), H.265 %d frames (%.2f MB); budget %.1f ms a frame", clips[c].name, k1,
+        n1 / 1048576.0, k2, n2 / 1048576.0, g_budget);
+    if (k1) {
+      bench_av1(av1, k1, 1, 1);
+      bench_av1(av1, k1, 2, 1);
+      bench_av1(av1, k1, 3, 3);
+    }
+    if (k2) {
+      bench_hevc(hevc, k2, 0);
+      bench_hevc(hevc, k2, 1);
+      for (int j = 0; j < k2; ++j) free((void *)hevc[j].data);
+    }
+    free(b1);
+    free(b2);
   }
   say("done: results in " DIR "results.txt; closing in 5 s");
   if (out) fclose(out);
