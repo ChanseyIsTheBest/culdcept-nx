@@ -16,9 +16,20 @@ sdmc:/switch/culdcept-nx/culdcept-nx.nro      the program
 sdmc:/switch/culdcept-nx/culdcept.toml        settings, the only toml the NRO reads (see "The tomls")
 sdmc:/switch/culdcept-nx/deko3d_shaders.bin   the prebuilt shader cache (optional: without it the first start
                                               compiles the game's 7 shaders, a second or two)
-sdmc:/switch/culdcept-nx/game_root/           the disc's files: default.xex and data/ (DATA00.RSP, MOVIE/, ...)
+sdmc:/switch/culdcept-nx/game_root/           the game's files: default.xex and data/ (DATA00.RSP, MOVIE/, ...),
+                                              as culdcept-nx-installer writes them, or the disc's files as they are
                                               (extract your ISO; the ISO itself is not read)
-The game's saves go to sdmc:/switch/culdcept-nx/renut/. No title update or DLC is needed or read.
+The game's saves go to sdmc:/switch/culdcept-nx/renut/, and cache/ keeps an index of game_root (later starts skip
+listing it; it is made again when the folder changes). No title update or DLC is needed or read.
+
+What the installer writes in game_root (1.0.0; all of it is read as the disc's files were, and a plain file next to
+one of these wins):
+  NAME.lz4b       the archives (LZ4) and effects (ZXC), packed in blocks and decompressed as the game reads them
+  data/MOVIE/     the movies re-encoded to H.265 in the same files, played by the Switch's video hardware (NVDEC);
+                  a WMV movie still plays as before
+  NAME.xma.xmo    the music and effects in Opus (music 128 kbit/s): the game sees the XMA file NAME.xma, and each of
+                  its frames is played from the Opus; the voices (44.1 kHz) stay XMA
+About 4.7 GB of disc files become about 2.6 GB.
 
 The tomls
 ---------

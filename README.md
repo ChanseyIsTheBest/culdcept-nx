@@ -1,157 +1,167 @@
-<h1 align=center>renut_nx_ultimate_base</h1>
+<div align=center>
 
-<p align=center>The Renut renderer for Nintendo Switch ports of Xbox 360 games, with every universal fix and optimisation of the ports so far in one place.</p>
+<img src="tools/switch/icon/culdcept_icon.jpg" alt="Culdcept Saga" width="30%">
 
-Each Switch port of an Xbox 360 game here (Banjo-Kazooie: Nuts & Bolts, Kameo, Halo 3, Viva Piñata, Ridge Racer 6, Sonic &
-All-Stars Racing Transformed, Blur, Pac-Man CE DX, Bangai-O HD and the others) carries its own copy of
-[reNut](https://github.com/masterspike52/reNut)'s Direct3D-level renderer on deko3d, and each copy fixed things the others
-never met. This repository puts them together: [katamari-nx](https://github.com/ChanseyIsTheBest/katamari-nx) 1.0.1 with
-the universal fixes and optimisations of the other ports applied to it, port by port, each with its source, its tests and
-its switch. A new port starts from here instead of from one game's copy.
+</div>
+<h1 align=center>Culdcept Saga — Nintendo Switch port</h1>
+
+A native Nintendo Switch port of the Xbox 360 version of **Culdcept Saga** (OmiyaSoft / Jamsworks, Namco Bandai Games,
+2008).
+
+It's not an emulator. The PowerPC code of the game's `default.xex` is statically recompiled to C++ with
+[ReXGlue](https://github.com/rexglue/rexglue-sdk) and compiled for the Switch, and the game's Direct3D calls are drawn
+directly on the Switch GPU's own API, deko3d, by [reNut](https://github.com/masterspike52/reNut)'s Direct3D-level renderer.
+It is built on [renut_nx_ultimate_base](docs/base-readme.md), which carries the fixes and optimisations of the other ports.
 
 > [!NOTE]
-> As checked in, this builds **Beautiful Katamari**: the game layer (code generation manifest, hooks, keys, hand-written
-> functions) is katamari-nx's. The renderer, the shader translator, plume, the SDK and the tools are the shared part. You
-> need your own copy of a game to build anything; this repository holds no game files and no code generated from a game.
+> You need your own copy of the Xbox 360 disc (a disc image, `.iso`, or the folder it was extracted to). No title update
+> or DLC is needed.
 
-## What's in it
+## How to install
 
-Every fix, with its source port and commit, the evidence for it, how it was tested here and its switch, is in
-[docs/ultimate-fixes.md](docs/ultimate-fixes.md); [docs/changelog.md](docs/changelog.md) has one line per port. In short:
+1. Open the installer page, [culdcept-nx-installer](https://github.com/ChanseyIsTheBest/culdcept-nx-installer) (Chrome
+   or Edge recommended).
+2. Choose your game: its **disc image** (`.iso`) or the **folder** you extracted it to. Leave the two re-encode options
+   ticked and press **Create culdcept-nx.zip**. Everything runs in your browser and the game files never leave your
+   computer: the page checks your copy, downloads the program, and makes the game folder smaller (about 4.7 GB down to
+   2.6 GB):
+   - the archives and effects packed with LZ4 and ZXC (the game reads them as they were);
+   - the movies re-encoded to H.265, which the Switch's video hardware plays (needs a browser with an H.265 encoder:
+     Chrome or Edge on a recent graphics card; otherwise they stay WMV);
+   - the music and sound effects re-encoded to Opus, the music at 128 kbit/s (the voices stay as they are).
+3. Extract the downloaded `culdcept-nx.zip` to the root of the SD card: it makes `switch/culdcept-nx/`.
+4. In Sphaira, find the game, press X for Options and choose **Install Forwarder**. Set **Address Space** to **39-bit**,
+   choose Create Forwarder, then start the game from the Home screen.
 
-<div align="center">
+```text
+/switch/culdcept-nx/
+  culdcept-nx.nro
+  culdcept.toml             (your settings; written at the first start when it is missing)
+  game_root/                (your game's files, as the installer wrote them)
+```
 
-| Area | What the base has | From |
-| --- | --- | --- |
-| Clipping, geometry, depth | the user clip enable at every command list, the game's clip plane for every vertex shader, both cull bits, vertex kill only when every vertex is killed; strip restarts, export-only shaders, finite vertex floats, missing inputs; the game's depth bias, compressed depth decompressed before a read, the EDRAM depth restore; `invariant gl_Position` so depth-equal passes cover the same pixels | rr6-nx, kameo-nx, vivapinata-nx, keflings-nx, halo3-nx, sasrt-nx, dishonored-nx |
-| Textures, targets, resolves | the fetch constant over SetTexture's pointer, fetch signs, exponents and integer formats, volumes, DXT3A; Kameo's hand-overs, gamma targets, 16-bit fixed targets, one EDRAM view through another, resolves that keep their target, occlusion queries; the 7e3 clamp; zero-level textures watched until their data comes | rr6-nx, kameo-nx, halo3-nx, sasrt-nx, vivapinata-nx, blur-nx, dishonored-nx |
-| Command buffers, memexport | replays inheriting the running device, recorded shader binds, memexport in place, tiles run once for every predicated tile | halo3-nx, sasrt-nx, vivapinata-nx |
-| Shader translator and passes | each fetch's own filters and LOD bias, the cube op, tessellation, indexed literals, raw vertex fetch; the fetch spec, plain fetches, the shader rounds (GPU items with in-run A/B targets), early alpha kill, the vertex fetch types | vivapinata-nx, kameo-nx, sasrt-nx, banjo-nx, feedingfrenzy-nx, dishonored-nx |
-| Renderer speed | small captures, the stream cache, NEON delta masks, the texture memo, specialised pipelines, resolves skipped or copied, the render queue as a lock-free ring, dynamic resolution, SMAA | bangaio-nx, kameo-nx, sasrt-nx, vivapinata-nx, sa2-nx, dishonored-nx |
-| Generated code and machine copies | the post-codegen passes (flush-mode flow, single floats, vector forms, dcbz as DC ZVA, stack forwarding); machine copies of hot functions in place, with whole-program register liveness and a guard that compares them with the original | banjo-nx, sa2-nx, sasrt-nx, blur-nx, katamari-nx |
-| Memory, threads, audio, SDK | a memory governor, guest thread stacks pooled (8 MB each), the SDK in the Switch's LTO and PGO, event waits on an address, lock-free XMA kicks (off), the XMA frame cache, rumble, guest sign-in for players 2-4, the time asleep not reaching the game, multi-disc games, LZ4-packed game files | sasrt-nx, blur-nx, feedingfrenzy2-nx, mk9-nx, ds3-nx, LostOdysseyRecomp |
+The game keeps its saves in `renut/` there, and adds `cache/` (an index of the game folder, so later starts skip
+listing it) and `deko3d_shaders.bin` (its seven shaders compiled for the Switch GPU, a second or two at the first start).
 
-</div>
+If you have an older version, delete its `switch/culdcept-nx/game_root` folder first: an unpacked file left there is
+used instead of the packed one. A game folder copied from the disc as it is (no installer) works too, just larger.
 
-Each fix keeps its source port's switch name. Nearly all are on by default; [docs/off-by-default.md](docs/off-by-default.md)
-lists the ones that are not and why (a fix one game needs that breaks another's picture, a faster form that is not exact,
-a speed-up the console measured as slower, a trial). Any of them can be set from a game's toml.
+To build everything yourself instead, see [docs/building.md](docs/building.md).
 
-## Defaults a new port settles
+## Controls
 
-- **SMAA is on** (`banjo_renut_smaa`) but runs only right after the draw whose pixel shader is listed in
-  `banjo_renut_smaa_after_ps`: until a game lists its own final composite (the last full-screen draw before the HUD), the
-  10 s log line says "SMAA ... 0 frames". `banjo_renut_diag_draw_log_s` logs a frame's draws to find it.
-- **MSAA is off** (`msaa_level` 1). A game's own sample count changes its picture: the port's decision.
-- **The keys of off-by-default.md section 1** fix one game's picture and break another's: a game turns one on only after
-  its own comparison shows the same fault.
-- **The machine copies' register liveness** relies on the 360 calling convention: check it on the game with
-  `tools/cc_entry_census.py` and `tools/cc_exit_census.py` ([docs/building.md](docs/building.md)).
-- **Guest thread stacks are 8 MB** (`switch_guest_stack_mb`); a game with deep recursion sets 16.
-- **Translator and pass changes** take effect when the game's shader package is made again; before a console
-  measurement, build its DKSH cache (`tools/deko3d_variant_cache.py`) so a first run does not compile while it draws.
-
-## State
-
-> [!WARNING]
-> **The base itself (Beautiful Katamari) has not run on a real console.** Ridge Racer 6 has, on the base
-> (2026-11-08: [docs/ultimate-fixes.md](docs/ultimate-fixes.md), "Ridge Racer 6 on the console"), and most later
-> ports carry their source port's console measurements.
-
-- Every port builds for the Switch (the everyday NRO, a guard NRO and an LTO + PGO NRO) and for the PC.
-- Each was tested here with Beautiful Katamari: the PC verify (the CPU verify and the guard on every machine copy:
-  0 differences), Ryujinx runs, the shader difftests for the shader passes, as its row in ultimate-fixes.md says. Menus,
-  the hub and a new game through to the practice room run with no errors logged, and the Switch build's picture matches
-  the PC's.
-- Katamari does not record command buffers, use memexport, draw 7e3 targets or bind textures by fetch constant alone, so
-  the fixes for those are only build-tested here; their source ports tested them.
-- The PGO profile in `pgo/` is katamari-nx 1.0.0's (the hooked form, no SDK counts); `pgo-inplace/` (the in-place copies'
-  profile) is empty: a port trains its own.
-
-## Starting a port from it
-
-[docs/porting-a-360-game-prompt.md](docs/porting-a-360-game-prompt.md) is the whole order of work, as a prompt for a
-coding-agent session. In short:
-
-1. Swap the game layer: `app/renut_manifest.toml` (the code generation config), the game's keys and fixes
-   (`app/src/katamari_*`, `app/src/cpu/hot`), its tomls (`app/katamari_switch*.toml`, `tools/make_katamari_tomls.py`,
-   `dist/switch/katamari-nx`) and its icon.
-2. Bind the D3D hooks to your game's own functions. They are bound to Katamari's addresses (XDK 2.0.5632); a game on
-   another XDK needs its own device layout ([docs/xdk-notes.md](docs/xdk-notes.md) has what ports at XDK 2.0.11164 met).
-   Some hook bodies wait for a game's own function ([docs/ultimate-fixes.md](docs/ultimate-fixes.md), "Needs the game's
-   own function address").
-3. Build as [docs/building.md](docs/building.md) describes: the PC build first (it runs the code generator and the
-   post-codegen steps, and builds the shader translator), then the shaders, then the NRO; then the tests.
-4. Settle the defaults above, then make its web installer from
-   [renut_nx_ultimate_installer](https://github.com/ChanseyIsTheBest/renut_nx_ultimate_installer).
-
-## Build
-
-Windows, LLVM clang and the VS Build Tools for the PC build; devkitA64, libnx and deko3d from
-[devkitPro](https://devkitpro.org) for the Switch; Python; and your own copy of the game. The whole process is in
-[docs/building.md](docs/building.md).
+By default the face buttons work **by position, as on the Xbox 360 pad** the game was made for: the bottom button is the
+Xbox's A, the right one is the Xbox's B, and so on.
 
 <div align="center">
 
-| Folder | Contents |
+| Switch | Xbox 360 |
 | --- | --- |
-| `app/` | The game layer and the renderer (`app/src/renut_engine/gpu`), the shader translator (`app/thirdparty/reblue-XenosRecomp`), plume, the CMake project ([app/README.md](app/README.md)) |
-| `sdk/` | ReXGlue SDK with the Horizon layer and the code generator changes |
-| `tools/` | Code generation steps, build and test scripts, shader tools, the difftests (`tools/difftest`) |
-| `pgo/` | katamari-nx's PGO profile (counts of which code ran, no game code or data) |
-| `dist/` | The settings of the test builds |
-| `docs/` | The documentation (below; [docs/README.md](docs/README.md) is its index) |
-| `shaders/` | masseffect-nx's old shader tools, not used by Renut's build ([shaders/README.md](shaders/README.md)) |
+| B (bottom) | A |
+| A (right) | B |
+| Y (left) | X |
+| X (top) | Y |
+| ZR / ZL | RT / LT |
+| R / L | RB / LB |
+| + | Start |
+| − | Back |
+| Sticks / D-pad | Sticks / D-pad |
 
 </div>
+
+**Two players:** every controller is its own player, in the order they connect (handheld counts as one). Single
+Joy-Cons are held sideways, one per player. **L + R + ZR** opens the system's controller screen.
+
+**The game menu:** **A + B + X + Y + L + R** (all at once) opens the port's own menu; + closes it.
+
+## Settings
+
+The game menu changes these and writes them to `culdcept.toml`:
+
+<div align="center">
+
+| Setting | Choices |
+| --- | --- |
+| Language | the system's, or one of the game's |
+| Handheld resolution | 960x540 to 1280x720 (default 1280x720) |
+| Docked resolution | 1280x720 to 1920x1080 (default 1920x1080) |
+| Rumble | on (default) / off |
+| MSAA | off (default), 2x, 4x |
+| Four cores | on (default) / off. It takes effect once `culdcept.toml` names your forwarder (`banjo_forwarder_program_id`): the forwarder's next launch gets four CPU cores instead of three. Highly recommended |
+| Xbox button layout | on (default: by position) / off (by letter) |
+| Joy-Cons sideways, and their stick | on (default) / off |
+| The menu's buttons, colour, font and background | as you like |
+
+</div>
+
+`culdcept.toml` also holds each player's button map (`[input_p1]`, `[input_p2]`). Delete it and the game writes the
+default one again at the next start. The test settings (logs, profiling, A/B runs) are described in the package's
+README.txt.
+
+## Performance
+
+The port runs at the console's stock clocks on three cores, 720 lines in handheld and 1080 docked. The released NRO is
+built with link-time optimisation and PGO trained on a full replay of a game. The title, menus and board hold 60 fps
+on average; the board still has short drops when the game loads its data (1 % lows of 12-16 fps in the last console
+session), worked on in [docs/culdcept-notes.md](docs/culdcept-notes.md).
+
+## How it works
+
+- **The game's code is translated, not emulated.** ReXGlue translates every function of the game's program to C++,
+  which is then compiled for the Switch, and gives the game what it expects from an Xbox 360: its system, files, audio
+  and controllers. The game's hottest functions run as native ARM code or as machine-optimised copies, each checked
+  against the generated original.
+- **A Direct3D-level renderer on deko3d.** The game's Direct3D calls are drawn by reNut's renderer with
+  [plume](https://github.com/renderbag/plume) on [deko3d](https://github.com/devkitPro/deko3d): no GPU command stream is
+  written or parsed and no EDRAM is modelled. The game's seven shaders are built into the NRO.
+- **Smaller game files, read as they were.** The packed files (LZ4 and ZXC in blocks) are decompressed as the game reads
+  them. A movie in H.265 is decoded by the Switch's video hardware (NVDEC, through FFmpeg's nvtegra backend) in place of
+  the game's WMV decoder. A sound in Opus (`NAME.xma.xmo`) is shown to the game as its XMA file, frame for frame, and
+  each frame's samples come from the Opus stream: loops and timing stay the game's own.
 
 ## Documentation
 
-| Page | What it is |
+<div align="center">
+
+| Document | What it explains |
 | --- | --- |
-| [docs/README.md](docs/README.md) | The index: where to start for each task, and what each page is |
-| [docs/building.md](docs/building.md) | Building, code generation, the shaders, the Switch builds, PGO, the installer, tests |
-| [docs/porting-a-360-game-prompt.md](docs/porting-a-360-game-prompt.md) | Starting a new port from the base: the order of work and the rules |
-| [docs/ultimate-fixes.md](docs/ultimate-fixes.md) | Every fix the base took, with its source, evidence, tests and switch |
-| [docs/changelog.md](docs/changelog.md) | One line per port |
-| [docs/off-by-default.md](docs/off-by-default.md) | The switches that are off by default, and why |
-| [docs/optimising-functions.md](docs/optimising-functions.md) | The hot-function method: machine copies and hand-written natives (Katamari's numbers) |
-| [docs/hand-and-machine-optimising-guide.md](docs/hand-and-machine-optimising-guide.md) | sasrt-nx's guide to the same, with its later tools |
-| [docs/sasrt-batch-cc2.md](docs/sasrt-batch-cc2.md) | The machine copies' register liveness and stack forwarding, and the calling-convention traps |
-| [docs/xdk-notes.md](docs/xdk-notes.md) | What ports at later XDKs met |
-| [docs/katamari-notes.md](docs/katamari-notes.md), [docs/codegen-crash-fixes.md](docs/codegen-crash-fixes.md) | katamari-nx's notes and crash fixes: the worked example |
-| [renut-nx's docs](https://github.com/ChanseyIsTheBest/renut-nx/tree/master/docs) | The method docs the base was built on: the renderer guide, the enhancements reference, deko3d, PGO and LTO |
+| [docs/building.md](docs/building.md) | Building the PC test build, the NRO, PGO, and the tests |
+| [docs/culdcept-notes.md](docs/culdcept-notes.md) | The port step by step: findings in the game's code, the console measurements, the movies and the audio |
+| [docs/console-testing.md](docs/console-testing.md) | What to run on the console and what the logs say |
+| [docs/optimising-functions.md](docs/optimising-functions.md) | How the game's functions are made faster |
+| [docs/base-readme.md](docs/base-readme.md), [docs/ultimate-fixes.md](docs/ultimate-fixes.md) | The base this port is built on and every fix it carries |
+| [docs/progress-log.md](docs/progress-log.md) | The work in order |
+
+</div>
 
 ## Credits
 
-- **ChanseyIsTheBest** — the ports and this base.
+- **OmiyaSoft, Jamsworks and Namco Bandai Games** — creators of Culdcept Saga. This is an unofficial, fan-made port with
+  no affiliation.
+- **ChanseyIsTheBest** — this port.
 - **[Tom Clay](https://github.com/rexglue/rexglue-sdk)** — the ReXGlue SDK, built on the work of the
   **[Xenia](https://xenia.jp)** team.
+- **[StevensND](https://github.com/StevensND/nfsmw-nx)** — nfsmw-nx: the Switch layer of the SDK and much of the method;
+  and nfsmw-nx-installer, the installer page this port's is built on.
 - **reNut and [masterspike52](https://github.com/masterspike52/reNut)** — reNut's Direct3D-level renderer (reused with its
-  author's permission); reNut's own contributors are credited in [app/README.md](app/README.md).
-- **[StevensND](https://github.com/StevensND/nfsmw-nx)** — nfsmw-nx: the Switch layer of the SDK and much of the method.
-- **[nebadasSwifty](https://github.com/nebadasSwifty/masseffect-nx)** — masseffect-nx.
-- **[hedge-dev](https://github.com/hedge-dev/XenosRecomp)** — XenosRecomp, the Xenos shader translator.
-- **[plume](https://github.com/renderbag/plume)** (from UnleashedRecomp), **[deko3d](https://github.com/devkitPro/deko3d)**
-  and **[uam](https://github.com/devkitPro/uam)** by fincs, with SwitchWakerHD's uam patches.
-- **[devkitPro](https://devkitpro.org) and [switchbrew](https://github.com/switchbrew/libnx)** — devkitA64 and libnx.
-- **[KhronosGroup](https://github.com/KhronosGroup/SPIRV-Cross)** — SPIRV-Cross.
-- The ports whose fixes are here: [renut-nx](https://github.com/ChanseyIsTheBest/renut-nx),
-  [katamari-nx](https://github.com/ChanseyIsTheBest/katamari-nx), [kameo-nx](https://github.com/ChanseyIsTheBest/kameo-nx),
-  [bangaio-nx](https://github.com/ChanseyIsTheBest/bangaio-nx), [pacman-nx](https://github.com/ChanseyIsTheBest/pacman-nx),
-  [keflings-nx](https://github.com/ChanseyIsTheBest/keflings-nx), [sa2-nx](https://github.com/ChanseyIsTheBest/sa2-nx),
-  [futari-nx](https://github.com/ChanseyIsTheBest/futari-nx),
-  [feedingfrenzy-nx](https://github.com/ChanseyIsTheBest/feedingfrenzy-nx), the Halo 3, Viva Piñata, Ridge Racer 6, Sonic &
-  All-Stars Racing Transformed, Blur and Feeding Frenzy 2 ports, [dishonored-nx](https://github.com/cznn999/dishonored-nx)
-  (cznn999), mk9-nx (Thorhax), ds3-nx (VasilkovND) and LostOdysseyRecomp.
+  author's permission).
+- **[plume](https://github.com/renderbag/plume)**, **[deko3d](https://github.com/devkitPro/deko3d)** and
+  **[uam](https://github.com/devkitPro/uam)** by fincs.
+- **[devkitPro](https://devkitpro.org) and [switchbrew](https://github.com/switchbrew/libnx)** — devkitA64, libnx and the
+  portlibs (FFmpeg with averne's nvtegra backend, libopus).
+- **[FFmpeg](https://ffmpeg.org)**, **[LZ4](https://github.com/lz4/lz4)**, **[ZXC](https://github.com/hellobertrand/zxc)**
+  and **[Opus](https://opus-codec.org)**.
+- The sibling ports (katamari-nx, rr6-nx, sasrt-nx, banjo-nx, blur-nx and the others in
+  [docs/base-readme.md](docs/base-readme.md)), which share their fixes with this one.
 - The other libraries listed in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
 
 ## Legal
 
-No affiliation with Microsoft, Nintendo or any game's publisher. This repository contains no game files and no code
-generated from a game. Users must provide their own legally obtained copy, and everything made from it (`app/generated/`,
-the shaders) is made on their own computer. Running homebrew requires custom firmware, which violates Nintendo's ToS and can
-get a console banned — your call.
+No affiliation with OmiyaSoft, Bandai Namco, Microsoft or Nintendo. "Culdcept" is a trademark of OmiyaSoft; the icon is
+the game's artwork. This repository contains no game files and no code generated from the game. Users must provide
+their own legally obtained copy, and everything made from it (`app/generated/`, the installer's files) is made on their
+own computer. Running homebrew requires custom firmware, which violates Nintendo's ToS and can get a console banned —
+your call.
 
 Source code is provided under the GPL-3.0 License (see [LICENSE](LICENSE)), like the ports it builds on. The SDK keeps its
 BSD-3-Clause license (see [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)).
