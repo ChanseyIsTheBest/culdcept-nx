@@ -19,8 +19,8 @@ It is built on [renut_nx_ultimate_base](docs/base-readme.md), which carries the 
 
 ## How to install
 
-1. Open the installer page, [culdcept-nx-installer](https://github.com/ChanseyIsTheBest/culdcept-nx-installer) (Chrome
-   or Edge recommended).
+1. Open the installer page: **https://chanseyisthebest.github.io/culdcept-nx-installer/** (Chrome or Edge
+   recommended; its source is [culdcept-nx-installer](https://github.com/ChanseyIsTheBest/culdcept-nx-installer)).
 2. Choose your game: its **disc image** (`.iso`) or the **folder** you extracted it to. Leave the two re-encode options
    ticked and press **Create culdcept-nx.zip**. Everything runs in your browser and the game files never leave your
    computer: the page checks your copy, downloads the program, and makes the game folder smaller (about 4.7 GB down to
