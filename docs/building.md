@@ -7,8 +7,11 @@ differ where they name the game (its own manifest, shader finder, tomls). You ne
 ## Tools
 
 Windows; LLVM clang and the Visual Studio Build Tools (CMake and Ninja) for the PC build (`tools/pc_env.bat` names the
-paths); devkitA64, libnx and deko3d from [devkitPro](https://devkitpro.org) for the Switch; Python 3 with `xxhash` and
-`Pillow`. The deko3d host tools (`out/deko3d_tools`: SPIRV-Cross and the PC uam) come from `tools/deko3d_build_tools.sh`.
+paths); devkitA64, libnx and deko3d from [devkitPro](https://devkitpro.org) for the Switch, with two of its portlibs:
+`switch-ffmpeg` (7.1, built with averne's nvtegra backend: the H.265 movies on the Switch's NVDEC, `tools/switch/nxvideo`,
+linked when its `hwcontext_nvtegra.h` is there) and `switch-libopus` (the music and effects in Opus, `NAME.xma.xmo`,
+`sdk/src/audio/xmo_opus.cpp`); `dkp-pacman -S switch-ffmpeg switch-libopus` installs both (this build: switch-ffmpeg
+7.1-5, switch-libopus 1.3-2). Python 3 with `xxhash` and `Pillow`. The deko3d host tools (`out/deko3d_tools`: SPIRV-Cross and the PC uam) come from `tools/deko3d_build_tools.sh`.
 
 ## 1. The game
 

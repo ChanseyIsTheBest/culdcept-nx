@@ -335,15 +335,26 @@ def main():
     ap.add_argument('--encoder', default='hevc_nvenc')
     ap.add_argument('--q', type=int, default=28)
     ap.add_argument('--gop', type=int, default=120)
+    # 2026-11-20: a bitrate of its own for each movie, a share of the original's video bitrate (the narrations at 35 %:
+    # PSNR 41.8 dB, SSIM 0.979 against the WMV3 picture). Constant quality (--q) made some narrations bigger than the
+    # originals: these WMVs are low-bitrate already, and a quality target spends bits on their artefacts.
+    ap.add_argument('--fraction', type=float, default=0.35, help='the share of the original video bitrate (0: --q)')
     a = ap.parse_args()
     src = Asf(open(a.src, 'rb').read())
     objs = src.media_objects()
     video = [o for o in objs if o['stream'] == src.video_stream]
+    seconds = (max(o['time'] for o in video) - min(o['time'] for o in video)) / 1000 * len(video) / max(1, len(video) - 1)
+    source_kbps = sum(len(o['data']) for o in video) * 8 / max(seconds, 0.001) / 1000
     with tempfile.TemporaryDirectory() as tmp:
         raw_path = os.path.join(tmp, 'v.hevc')
         if a.encoder == 'libx265':
             enc = ['-c:v', 'libx265', '-crf', str(a.q), '-preset', 'medium',
                    '-x265-params', f'bframes=0:aud=1:repeat-headers=1:keyint={a.gop}:min-keyint={a.gop}:log-level=error']
+        elif a.fraction > 0:
+            kbps = max(200, int(source_kbps * a.fraction))
+            enc = ['-c:v', 'hevc_nvenc', '-bf', '0', '-aud', '1', '-g', str(a.gop), '-rc', 'vbr', '-b:v', f'{kbps}k',
+                   '-maxrate', f'{kbps * 3 // 2}k', '-bufsize', f'{kbps * 2}k', '-preset', 'p7', '-tune', 'hq',
+                   '-multipass', 'fullres', '-forced-idr', '1']
         else:
             enc = ['-c:v', 'hevc_nvenc', '-bf', '0', '-aud', '1', '-g', str(a.gop), '-rc', 'vbr', '-cq', str(a.q),
                    '-preset', 'p6', '-forced-idr', '1']
