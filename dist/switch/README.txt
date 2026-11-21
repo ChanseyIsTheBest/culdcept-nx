@@ -13,6 +13,8 @@ battd_nx (the GPU arena), bejeweled3-nx and the zuma ports (the hot-function met
 SD card layout
 --------------
 sdmc:/switch/culdcept-nx/culdcept-nx.nro      the program
+sdmc:/switch/culdcept-nx/deko3d_glsl.bin      the three shaders of default.xex, translated by culdcept-nx-installer
+                                              (the release NRO carries only the four the game makes at run time)
 sdmc:/switch/culdcept-nx/culdcept.toml        settings, the only toml the NRO reads (see "The tomls")
 sdmc:/switch/culdcept-nx/deko3d_shaders.bin   the prebuilt shader cache (optional: without it the first start
                                               compiles the game's 7 shaders, a second or two)

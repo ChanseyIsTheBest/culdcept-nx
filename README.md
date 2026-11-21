@@ -37,6 +37,7 @@ It is built on [renut_nx_ultimate_base](docs/base-readme.md), which carries the 
 ```text
 /switch/culdcept-nx/
   culdcept-nx.nro
+  deko3d_glsl.bin           (the three shaders of your default.xex, translated by the installer)
   culdcept.toml             (your settings; written at the first start when it is missing)
   game_root/                (your game's files, as the installer wrote them)
 ```
@@ -114,7 +115,8 @@ session), worked on in [docs/culdcept-notes.md](docs/culdcept-notes.md).
   against the generated original.
 - **A Direct3D-level renderer on deko3d.** The game's Direct3D calls are drawn by reNut's renderer with
   [plume](https://github.com/renderbag/plume) on [deko3d](https://github.com/devkitPro/deko3d): no GPU command stream is
-  written or parsed and no EDRAM is modelled. The game's seven shaders are built into the NRO.
+  written or parsed and no EDRAM is modelled. The three shaders stored in `default.xex` are translated by the installer
+  from your copy (`deko3d_glsl.bin`); the NRO carries only the four the game makes while it runs.
 - **Smaller game files, read as they were.** The packed files (LZ4 and ZXC in blocks) are decompressed as the game reads
   them. A movie in H.265 is decoded by the Switch's video hardware (NVDEC, through FFmpeg's nvtegra backend) in place of
   the game's WMV decoder, and each picture is copied out for the game's player by the VIC (about 3 ms a frame). A sound in Opus (`NAME.xma.xmo`) is shown to the game as its XMA file, frame for frame, and

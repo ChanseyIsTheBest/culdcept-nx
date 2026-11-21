@@ -23,6 +23,7 @@ console run needs the console owner's word first.
   ls [PATH]                  ftp listing (default: the port's folder)
   get REMOTE [LOCAL]         ftp download (a folder: every file in it, one level)
   put LOCAL REMOTE           ftp upload (overwrites a file of that name in the folder)
+  put-tree LOCALDIR REMOTE   a whole folder on one connection: folders made, files at their size kept, the rest written
   mv REMOTE NEW              ftp rename inside the port's folder; refused when NEW exists (it would be replaced)
   raw "CMD ..."              a sys-botbase command as it is, the reply printed
   album-ls [PATH]            the Album, read only: /Nintendo/Album... or /emuMMC/<folder>/Nintendo/Album...
@@ -266,6 +267,75 @@ def ftp_get_many(host, items, log=print, pause=0.2):
     return failed
 
 
+def ftp_put_tree(host, local_dir, remote_dir, log=print, pause=0.05):
+    """culdcept-nx (2026-11-21): a whole folder (an installer zip as extracted) uploaded on one control session, as
+    ftp_get_many reads: a connection per file (put) costs seconds each over 5,861 files. Folders are made as needed
+    (MKD; one that exists is fine), a file already there at its size is kept (so a run that stopped can go on), every
+    other file is written over and its size on the card checked (SIZE). Nothing is deleted. Returns the failed paths."""
+    items = []
+    for base, dirs, files in os.walk(local_dir):
+        dirs.sort()
+        rel = os.path.relpath(base, local_dir).replace(os.sep, '/')
+        remote_base = remote_dir if rel == '.' else remote_dir + '/' + rel
+        items.append(('dir', None, sd_path(remote_base)))
+        for name in sorted(files):
+            items.append(('file', os.path.join(base, name), sd_path(remote_base + '/' + name)))
+    failed, f, have = [], None, {}
+    done = sent = count = 0
+    total = sum(os.path.getsize(p) for k, p, _ in items if k == 'file')
+    t0 = time.time()
+    for kind, local, remote in items:
+        count += kind == 'file'
+        for attempt in range(8):
+            try:
+                if f is None:
+                    f = ftp_open(host)
+                    f.voidcmd('TYPE I')
+                    have = {}
+                if kind == 'dir':
+                    try:
+                        f.mkd(remote)
+                    except error_perm:
+                        pass  # it exists (checked by the listing below)
+                    lines = []
+                    f.cwd(remote)
+                    f.retrlines('LIST', lines.append)
+                    have = {}
+                    for line in lines:
+                        parts = line.split(None, 8)
+                        if len(parts) == 9 and not line.startswith('d'):
+                            have[parts[8]] = int(parts[4])
+                    break
+                size = os.path.getsize(local)
+                if have.get(posixpath.basename(remote)) == size:
+                    done += size
+                    break
+                with open(local, 'rb') as src:
+                    f.storbinary('STOR ' + remote, src, blocksize=1 << 16)
+                got = f.size(remote)
+                if got != size:
+                    raise IOError('%s on the card is %s bytes, not %d' % (remote, got, size))
+                done += size
+                sent += size
+                break
+            except Exception as e:
+                if f is not None:
+                    rst_close(f.sock)
+                    f = None
+                log('%s retry %s (%s)' % (time.strftime('%H:%M:%S'), remote, str(e).strip()))
+                time.sleep(1.0 + attempt * 2.0)
+        else:
+            failed.append(remote)
+        if kind == 'file':
+            if count % 200 == 0 or done == total:
+                rate = sent / max(1e-3, time.time() - t0) / 1048576
+                log('%s %.0f of %.0f MB (%.1f MB/s sent)' % (time.strftime('%H:%M:%S'), done / 1048576, total / 1048576, rate))
+            time.sleep(pause)
+    if f is not None:
+        rst_close(f.sock)
+    return failed
+
+
 def ftp_names(host, remote):
     """The names in a folder on the card (one level)."""
     def run(f):
@@ -405,6 +475,14 @@ def main():
         remote = sd_path('logs/rex/stall_dump')
         ftp_retry(host, lambda f: f.storbinary('STOR ' + remote, io.BytesIO(b'')))
         print('requested a stall dump:', remote, time.strftime('%H:%M:%S'))
+    elif cmd == 'put-tree':
+        sd_path(rest[1])  # refused before any connection when it is outside the port's folder
+        failed = ftp_put_tree(host, rest[0], rest[1])
+        print('put-tree %s -> %s: %d failed' % (rest[0], sd_path(rest[1]), len(failed)))
+        for p in failed:
+            print('FAILED', p)
+        if failed:
+            sys.exit(1)
     elif cmd in ('ls', 'get', 'put', 'mv'):
         # Refused before any connection is made: the card path is rest[1] for put, rest[0] for the others (both for mv).
         sd_path(rest[1] if cmd == 'put' else (rest[0] if rest else ''))

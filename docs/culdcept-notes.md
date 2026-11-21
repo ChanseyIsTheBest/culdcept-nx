@@ -133,6 +133,17 @@ ps_3_0), with the XDK's whole D3DX HLSL compiler linked statically (2,589 functi
   the translator (keyed by the original's hash, as container_0e.h), and Renut accepts 0x10 at its four checks
   (`d3d/hooks/shader.cpp`, `render/fetch_filters.cpp`). A base handoff (any game at this XDK that compiles at run time).
 - The Switch package (`tools/switch_shaders.ps1`): 7 shaders, 16 KB of GLSL (`app/out/renut_switch/deko3d_glsl.bin`).
+- **The release split (2026-11-21, the user: "isn't the web browser meant to extract shaders from the game? like the
+  other ports"):** three of the seven are containers in `default.xex` (`vs_0BCAAC9846B41BDC`, `ps_7BAA41FE92EC6FC4`,
+  `ps_FF5573F07BC4ED47`, 4-aligned at 0x134F80-0x135290 of the image); the other four are in no game file (the game
+  compiles two from `data/shader.fx` and makes two from parts). So the released NRO carries those four only
+  (`tools/renut_release_shaders.py --keep-runtime`, built with `-DBANJO_RENUT_RELEASE_SHADERS=ON`: their GLSL in raw
+  frames and their four entries of the table), and culdcept-nx-installer makes the three from the player's
+  `default.xex` (its `lib/sources.js` finds 0x10 containers, its WebAssembly translator is built from this tree's
+  XenosRecomp with `container_10.h`). The page's GLSL of the three is the native chain's byte for byte
+  (`test/full_node.mjs --native-glsl`: 3 the same, 0 differ), so the picture is the same. At start the NRO reads the
+  page's `deko3d_glsl.bin` (version 2) and merges the tables (shader_library.cpp: "3 shaders from the installed
+  package, 4 of this build's own").
 
 ## The picture on the PC (Renut on Vulkan, 2026-11-19)
 

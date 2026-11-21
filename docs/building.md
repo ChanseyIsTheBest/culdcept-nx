@@ -112,7 +112,12 @@ its form, so with the defaults these steps make and use `pgo-inplace/`; with `IN
    the folder already has `.gcda` files: move them aside first).
 3. **Optimised:** `-DBANJO_PGO=use -DBANJO_SWITCH_LTO=ON -DBANJO_RENUT_RELEASE_SHADERS=ON` (`tools/build_switch_release.bat`,
    in place; its configure stops while `pgo-inplace/` has no profile, and `IN_PLACE=OFF` builds the hooked form with
-   `pgo/`). It carries no game shader and reads `deko3d_glsl.bin` beside itself. `pgo/` in this repository is the
+   `pgo/`). It carries no game shader and reads `deko3d_glsl.bin` beside itself. Culdcept Saga's (2026-11-21): run
+   `python tools/renut_release_shaders.py --keep-runtime` first. It carries the four shaders the game makes at run
+   time (two compiled from `data/shader.fx`, two made from parts: in no game file), and the installer makes the three
+   of `default.xex` (`make_release.py --nro-shaders app/out/renut_switch_release/runtime_captures`). An existing build
+   folder takes the option from `cmake -DBANJO_RENUT_RELEASE_SHADERS=ON <folder>` (`CMAKE_EXTRA` is read for a new
+   folder only). `pgo/` in this repository is the
    profile of the releases before port 81 (the hooked form). A function changed since the instrumented build keeps no
    profile. So train again after a change to the draw path's own functions: port 179 added calls inside
    FastDrawLocked and DrawStateLocked, and Blur's NRO with the profile trained before it drew at 14.75 us a draw
