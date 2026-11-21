@@ -186,17 +186,25 @@ class XmoHandle : public FileHandle {
 
  private:
   // Packet p of NAME's data: its header, the length fields and last bits of the frames in it (a frame is at most 32767
-  // bits: one that starts two packets before can reach into it), then its tag.
+  // bits: one that starts two packets before can reach into it), then its tag if a frame starts in it.
   void Synthesize(uint32_t p, uint8_t* packet) const {
     std::memset(packet, 0, kXmoPacketBytes);
     std::memcpy(packet, packet_headers_.data() + size_t(p) * 4, 4);
     const uint64_t from = p >= 2 ? uint64_t(p - 2) * kPacketBits : 0, to = uint64_t(p + 1) * kPacketBits;
     auto it = std::lower_bound(frames_.begin(), frames_.end(), from,
                                [](const Frame& f, uint64_t v) { return f.pos < v; });
+    bool starts = false;  // a frame of the table starts in packet p
     for (; it != frames_.end() && it->pos < to; ++it) {
       Put(packet, p, *it, 0, kFrameHeaderBits, it->len);
       Put(packet, p, *it, uint32_t(it->len) - 1, 1, it->last);
+      starts = starts || it->pos >= uint64_t(p) * kPacketBits;
     }
+    // culdcept-nx 1.0.1 (2026-11-21, found by the sasrt-nx session; its PacketMaker::Synthesize has the same rule): only
+    // a packet a frame starts in carries a tag (xmo.h). A sound's last packet can say a frame starts in it (skip count
+    // not 0xFF) with its first frame offset past its end: XmoTagBits then gives bits 47 on, the end of the frame that
+    // runs into it, and the tag set that frame's last bit ("another frame follows") when it ends before bit 119. Of the
+    // 619 .xmo files, 12 had such a packet and se_024's last frame was changed (an extra frame read from the tag).
+    if (!starts) return;
     uint16_t bits[kXmoTagBits];
     if (XmoTagBits(packet, bits, kXmoTagBits) < kXmoTagBits) return;  // no frame starts here (the installer checked)
     for (uint32_t k = 0; k < kXmoTagBits; ++k) {

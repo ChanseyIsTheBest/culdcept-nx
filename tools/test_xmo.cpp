@@ -154,12 +154,15 @@ int main(int argc, char** argv) {
     }
     if (last) set(frame_pos(pos, len - 1));
   }
+  // 1.0.1: the packets a frame of the table starts in, the only ones with a tag
+  std::vector<uint8_t> starts(packets, 0);
+  for (uint32_t i = 0; i < frames; ++i) starts[Le32(table + size_t(i) * 8) / 16384] = 1;
   uint32_t tagged = 0;
   for (uint32_t p = 0; p < packets; ++p) {
     const uint8_t* op = orig.data() + data_offset + size_t(p) * 2048;
     std::memcpy(expected.data() + data_offset + size_t(p) * 2048, op, 4);
     uint16_t bits[kXmoTagBits];
-    if (XmoTagBits(op, bits, kXmoTagBits) < kXmoTagBits) continue;
+    if (!starts[p] || XmoTagBits(op, bits, kXmoTagBits) < kXmoTagBits) continue;
     // the 72-bit tag, MSB first: magic, sound id, packet index
     for (uint32_t k = 0; k < kXmoTagBits; ++k) {
       const uint32_t v = k < 16 ? (kXmoTagMagic >> (15 - k)) & 1 : k < 48 ? (id >> (47 - k)) & 1 : (p >> (71 - k)) & 1;
@@ -174,6 +177,19 @@ int main(int argc, char** argv) {
         std::fprintf(stderr, "FAIL: packet %u byte %u: %02X, expected %02X\n", p, k, syn[at + k], expected[at + k]);
         return 1;
       }
+    }
+  }
+  // 1.0.1: each frame's length field and last bit read back from the synthesized file (the tag must change neither:
+  // the check above builds its expected bytes by the same rule as the reader, so it alone cannot see that)
+  for (uint32_t i = 0; i < frames; ++i) {
+    const uint32_t pos = Le32(table + size_t(i) * 8), len = Le16(table + size_t(i) * 8 + 4);
+    uint32_t b = 0;
+    for (uint32_t j = 0; j < 15; ++j) b = (b << 1) | bit(syn, frame_pos(pos, j));
+    const uint32_t last = bit(syn, frame_pos(pos, len - 1));
+    if (b != len || last != table[size_t(i) * 8 + 6] || last != bit(orig, frame_pos(pos, len - 1))) {
+      std::fprintf(stderr, "FAIL: frame %u reads back as length %u last bit %u (the table: %u, %u)\n", i, b, last, len,
+                   table[size_t(i) * 8 + 6]);
+      return 1;
     }
   }
   if (!XmoSoundKnown(id)) {

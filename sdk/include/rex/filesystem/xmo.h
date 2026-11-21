@@ -25,7 +25,8 @@
  * before its last bit, as far as the packet's end; then the packet's bits from 47 (after the header and the 15 bits a
  * frame header split across packets can put there) to the bit before its first frame (the end of a frame that began in
  * an earlier packet). Every packet a frame of the game's 48 kHz files starts in has 104 such bits or more; the installer
- * keeps a file as XMA when one has fewer than 72.
+ * keeps a file as XMA when one has fewer than 72. A packet no frame of the frame table starts in has no tag, even when
+ * its skip count is not 0xFF (a sound's last packet can say a frame starts in it, its first frame offset past its end).
  *
  * A frame is the one at (the tag's packet, the frame's bit in it): its index k in the frame table. Its samples are
  * [512 k, 512 k + 512) of the sound after the Opus pre-skip: what FFmpeg's xmaframes decoder gave for that frame when

@@ -836,3 +836,37 @@ frame-threaded hook. Every movie stays H.265 (the user: "Lets do h.265 for all t
   Its first full run kept 34 movies as WMV and 63 sounds as XMA: the worker pool posts a busy worker its next job, and
   the movie and audio workers' handlers awaited the encoder, so a second job reopened the one WebAssembly decoder under
   the first (each worker now takes its jobs one at a time).
+
+## 1.0.1: the .xmo tag only where a frame starts (2026-11-21/22, the user: "we will add two things for 1.0.1 fix that")
+
+- **The report** (the sasrt-nx session, 2026-11-21): XmoHandle::Synthesize wrote the tag into any packet with 72 tag
+  bits, but xmo.h's rule is "a packet a frame starts in". A sound's last packet can have a skip count other than 0xFF
+  (it says a frame starts in it) with its first frame offset past its end (16416: header bits 32 + 16384). XmoTagBits
+  then gives bits 47 on (the end of the frame that runs into it), and the tag sets that frame's last bit ("another frame
+  follows") when the frame ends before bit 119.
+- **Culdcept's files** (all 619 .xmo of packed_root, the reader simulated and every frame's length and last bit read
+  back; scratch tool xmo_tag_check.py): 12 have such a last packet (bgm_05_03, bgm_10_03, bgm_12_03, bgm_16_01,
+  bgm_19_02, bgm_21_01, se_024, se_056, se_057, se_10_16, se_20_05, se_24_03); 11 harmless (the tag in the end of a
+  frame's zeroed bits), and se_024's last frame (113, ending at bit 90 of packet 9) changed: its last bit 1, so the
+  emulation reads a frame at bit 90 whose length comes from the tag (20,480 bits: past the file's end).
+- **Why the test missed it**: tools/test_xmo.cpp built its expected bytes by the reader's own rule. 1.0.1's test tags
+  only the packets a frame of the table starts in and reads every frame's length field and last bit back from the
+  synthesized file. On all 619: the fixed reader 619 OK; 1.0.0's reader fails exactly the 12 above.
+- **The fix**: Synthesize tags packet p only when a frame of the table starts in it (sasrt-nx's PacketMaker::Synthesize
+  has the same). The .xmo files and the installer are unchanged: an install made for 1.0.0 needs only the new NRO.
+- **ZXC around the H.265 movies? No** (the user asked, 2026-11-21; "leave zxc movies out of 1.0.1"): the 39 H.265 movies
+  of the full installer test, 414.0 MB, are 410.7 MB with ZXC 7 in 512 KB blocks (0.8 % saved) and 412.0 MB with LZ4
+  HC 9. RR6's and SASRT's movie files keep the game's container with zeros where the pictures were (ZXC removes the
+  zeros); Culdcept's installer writes the H.265 pictures into the ASF file itself, so there is nothing left to take
+  out. The H.265 movies themselves: 1,068.8 MB of WMV -> 414.0 MB (38.7 %; narrations 39.8 %, the endings 36.7 %, the
+  credits 35.2 %).
+- **Checked** (2026-11-22): tools/test_xmo.cpp on the 619 .xmo of packed_root and on the 634 the page made in Chrome
+  (the full test's zip): the fixed reader all OK; 1.0.0's fails the same 12 in both. The release NRO built again
+  (app/out/switch-pgo-use, PGO + LTO, version 1.0.1, SHA-256 6f3280e4...): Ryujinx v101a with the replay toml, 5 min, 0
+  errors, 16 sounds from Opus, no [xmo] warning, the H.265 movies 0 damaged. On the console (out/console_runs/v101_c1,
+  01:17-01:23, the user's install from the page: 634 .xmo, the shipped toml with `log_level = "info"` added for the run;
+  the user's replay): 0 errors, 22 sounds from Opus including se_024, no [xmo] warning, 3 H.265 movies 0 damaged, the
+  board 59.2-59.8 fps over 10 s windows. 1.0.0 played se_024 in the same replay without a warning too (v100_c1,
+  v100a): the extra frame runs past the end of the file's data, so the emulation never decoded it. Then the user's
+  1.0.0 NRO and culdcept.toml put back (the toml compared equal); 1.0.1 left on the card as
+  culdcept-nx_1.0.1_test.nro.
